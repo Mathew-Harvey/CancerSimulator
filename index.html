@@ -1,0 +1,2551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bioelectric Cellular Collective: Cancer as Communication Disorder</title>
+    <!-- Add p5.js with fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script>
+        // Check if p5 is loaded
+        window.addEventListener('load', function() {
+            if (typeof p5 === 'undefined') {
+                console.error("p5.js not loaded! The simulation requires p5.js to run.");
+                document.body.innerHTML = '<div style="color: red; padding: 20px; text-align: center;">Error: p5.js could not be loaded. Please check your internet connection or try again later.</div>' + document.body.innerHTML;
+            } else {
+                console.log("p5.js loaded successfully!");
+            }
+        });
+    </script>
+
+    <!-- Add Chart.js with fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        // Create global placeholder for Chart
+        window.Chart = null;
+
+        // Function to load Chart.js
+        function loadChartJS() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chart.js/3.7.0/chart.min.js';
+                script.onload = () => {
+                    console.log("Chart.js loaded successfully!");
+                    resolve();
+                };
+                script.onerror = (event) => {
+                    console.error("Chart.js failed to load:", event);
+                    console.log("Using fallback visualization for charts.");
+                    // Define a dummy Chart object if loading fails
+                    window.Chart = function(context, config) {
+                        console.log("Dummy Chart created. Configuration:", config);
+                        const fallbackElement = document.getElementById('population-chart-container');
+                        if (fallbackElement && !fallbackElement.querySelector('.chart-fallback-message')) {
+                            const fallbackMessage = document.createElement('div');
+                            fallbackMessage.textContent = "Chart library failed to load. Displaying basic data.";
+                            fallbackMessage.style.color = '#ffcccc';
+                            fallbackMessage.style.textAlign = 'center';
+                            fallbackMessage.style.marginTop = '20px';
+                            fallbackMessage.className = 'chart-fallback-message';
+                            fallbackElement.appendChild(fallbackMessage);
+                        }
+                        return {
+                            update: function() {
+                                // Basic fallback update - could display text numbers
+                                // console.log("Dummy chart update called");
+                                // This will be handled by the fallback drawing function if needed
+                            },
+                            destroy: function() {
+                                const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
+                                if (fallbackMessage) fallbackMessage.remove();
+                                console.log("Dummy chart destroy called");
+                            }
+                        };
+                    };
+                    resolve(); // Resolve anyway since we have a fallback mechanism
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        // Load Chart.js when the page loads
+        window.addEventListener('load', function() {
+            loadChartJS().then(() => {
+                // Add a notice to the data panel if using fallback
+                if (typeof Chart !== 'function' || Chart.name !== 'Chart') { // Check if it's the real Chart or our dummy
+                     const dataPanel = document.getElementById('data-panel');
+                     if (dataPanel && !dataPanel.querySelector('.chart-load-notice')) {
+                        const notice = document.createElement('div');
+                        notice.style.color = '#ff9999';
+                        notice.style.padding = '10px';
+                        notice.style.marginTop = '10px';
+                        notice.style.background = 'rgba(50,20,20,0.3)';
+                        notice.style.borderRadius = '5px';
+                        notice.textContent = 'Chart.js could not be loaded. Simple visualization mode active.';
+                        notice.className = 'chart-load-notice';
+                        dataPanel.prepend(notice);
+                     }
+                 }
+            });
+        });
+    </script>
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; background-color: #12121e; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #f4f4ff; overflow-x: hidden; padding-top: 15px; }
+        #canvas-container { margin-bottom: 15px; box-shadow: 0px 5px 30px rgba(180, 180, 255, 0.12); border-radius: 10px; overflow: hidden; position: relative; background-color: #1f1f35; }
+        .simulation-header { width: 90%; max-width: 950px; margin-bottom: 15px; text-align: center;}
+        .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 10px; align-items: center; width: 90%; max-width: 800px;}
+        button { padding: 10px 16px; font-size: 1em; background-color: #6060a5; color: #f4f4ff; border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.3s ease, transform 0.1s ease; box-shadow: 0px 2px 6px rgba(0,0,0,0.25); }
+        button:hover { background-color: #8080c5; }
+        button:active { transform: scale(0.96); }
+        .slider-container { display: flex; align-items: center; gap: 8px; color: #d0d0f0; font-size: 0.9em;}
+        input[type=range] { cursor: pointer; }
+        .info-text { max-width: 850px; text-align: center; padding: 0 15px; line-height: 1.6; font-size: 1em; color: #d8d8f8; margin-bottom: 15px; display: inline-block;}
+        h1 { color: #f8f8ff; margin-bottom: 10px; font-weight: 400; letter-spacing: 1.5px;}
+        a { color: #c8c8ff; text-decoration: none; font-weight: 500;}
+        a:hover { text-decoration: underline; }
+        #status { font-weight: 600; color: #ffffff; min-height: 22px; margin-bottom: 12px; font-size: 1.1em; text-align: center; width: 90%;}
+        #tooltip { position: absolute; background-color: rgba(20, 20, 40, 0.92); border: 1px solid rgba(200, 200, 255, 0.6); color: white; padding: 9px 14px; border-radius: 7px; font-size: 0.95em; pointer-events: none; display: none; white-space: normal; max-width: 300px; box-shadow: 0 3px 12px rgba(0,0,0,0.45); z-index: 100; }
+        .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px 20px; margin-top: 10px; font-size: 0.9em; width: 90%; max-width: 800px;}
+        .legend-item { display: flex; align-items: center; gap: 7px;}
+        .legend-color { width: 15px; height: 15px; border-radius: 50%; border: 1px solid #777; }
+        .legend-signal { font-size: 1.2em; line-height: 1; }
+
+        /* Improvement 1: Scientific Concept Panel */
+        #concept-panel {
+            position: fixed; /* Fixed position */
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            background-color: rgba(25, 25, 50, 0.95);
+            border: 1px solid #6060a5;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            z-index: 100;
+            max-height: calc(100vh - 100px); /* Adjusted max-height */
+            overflow-y: auto;
+            transition: transform 0.4s ease-in-out;
+            transform: translateX(calc(100% + 40px)); /* Start off-screen */
+        }
+        #concept-panel.show {
+            transform: translateX(0);
+        }
+        #concept-panel h3 {
+            margin-top: 0;
+            color: #c8c8ff;
+            border-bottom: 1px solid #6060a5;
+            padding-bottom: 8px;
+        }
+        #concept-panel p {
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        #concept-panel .concept-item {
+            margin-bottom: 12px;
+        }
+        #concept-panel .concept-item h4 {
+            margin: 0 0 5px 0;
+            color: #a8c8ff;
+        }
+        #toggle-concept-panel {
+            position: fixed; /* Fixed position */
+            top: 20px;
+            right: 20px;
+            z-index: 101;
+            padding: 8px 12px;
+            background-color: #6060a5;
+        }
+
+        /* Improvement 2: Tutorial Mode */
+        #tutorial-overlay {
+            position: fixed; /* Changed to fixed */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 200;
+            display: none;
+            align-items: center; /* Center vertically */
+            justify-content: center; /* Center horizontally */
+        }
+        .tutorial-step {
+            /* Removed absolute positioning, using flexbox centering */
+            background-color: #2a2a4a;
+            border: 2px solid #8080c5;
+            border-radius: 10px;
+            padding: 20px;
+            width: 90%; /* Relative width */
+            max-width: 350px; /* Max width */
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            display: none;
+            color: #e0e0ff;
+        }
+        .tutorial-step.active {
+            display: block;
+        }
+         .tutorial-step h4 {
+            margin-top: 0;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .tutorial-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .tutorial-controls button {
+            padding: 8px 14px;
+            font-size: 0.9em;
+        }
+
+        /* Improvement 16: Population Dynamics Graph */
+        #data-panel {
+            width: 90%;
+            max-width: 850px;
+            background-color: #1f1f35;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0px 5px 30px rgba(180, 180, 255, 0.12);
+            display: none; /* Initially hidden */
+        }
+        #data-panel.show {
+            display: block;
+        }
+        #population-chart-container {
+            width: 100%;
+            height: 200px;
+            margin-top: 10px;
+            position: relative; /* Needed for fallback message positioning */
+        }
+
+        /* Improvement 18: Metrics Panel */
+        #metrics-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            justify-content: space-around;
+        }
+        .metric-box {
+            background-color: rgba(50, 50, 80, 0.7);
+            border-radius: 8px;
+            padding: 12px;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+        .metric-title {
+            font-size: 0.85em;
+            color: #a0a0d0;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        /* Improvement 19: Cancer Progression Indicator */
+        #cancer-stage-indicator {
+            width: 90%;
+            max-width: 800px;
+            height: 25px;
+            background-color: rgba(50, 50, 80, 0.5);
+            border-radius: 20px;
+            margin: 5px 0 15px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        #cancer-stage-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4050A0, #6050A0, #A050A0, #FF3070);
+            transition: width 0.5s ease-in-out;
+        }
+        #cancer-stage-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: 600;
+            text-shadow: 0 0 3px rgba(0,0,0,0.8);
+            font-size: 0.9em;
+        }
+
+        /* Improvement 3: Visual Annotations */
+        .annotation {
+            position: absolute; /* Positioned relative to canvas-container */
+            background-color: rgba(20, 20, 40, 0.9);
+            border: 1px solid #8080c5;
+            border-radius: 5px;
+            padding: 8px 12px;
+            pointer-events: none;
+            font-size: 0.85em;
+            max-width: 180px;
+            transform: translate(-50%, calc(-100% - 15px)); /* Position above point */
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            z-index: 90;
+            color: #e8e8ff;
+            text-align: center;
+            opacity: 0; /* Start hidden for fade-in */
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .annotation::after { /* Arrow pointing down */
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 6px 0;
+            border-style: solid;
+            border-color: rgba(20, 20, 40, 0.9) transparent transparent transparent;
+        }
+        .annotation.visible {
+            opacity: 1;
+            transform: translate(-50%, calc(-100% - 10px)); /* Final position */
+        }
+
+
+        /* Improvement 12: Cell Detail View */
+        #detail-view {
+            position: absolute; /* Positioned relative to canvas-container */
+            width: 200px; /* Slightly larger */
+            height: 220px; /* Slightly taller */
+            background-color: rgba(20, 20, 40, 0.95);
+            border: 1px solid #8080c5;
+            border-radius: 10px;
+            padding: 10px;
+            right: 10px;
+            bottom: 10px;
+            display: none; /* Initially hidden */
+            z-index: 90;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #detail-view.show {
+            display: block;
+        }
+        #detail-canvas {
+            display: block; /* Prevent extra space below canvas */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Improvement 4: Cell Lifecycle Diagram (Placeholder) */
+        /* Hide for now, can be implemented later */
+        #lifecycle-diagram { display: none; }
+        /* Example style if implemented:
+        #lifecycle-diagram {
+            position: absolute;
+            width: 250px;
+            height: 150px;
+            background-color: rgba(20, 20, 40, 0.9);
+            border: 1px solid #8080c5;
+            border-radius: 10px;
+            padding: 15px;
+            left: 20px;
+            bottom: 20px;
+            display: none;
+            z-index: 90;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #lifecycle-diagram.show { display: block; }
+        */
+
+        /* Improvement 13: Event Timeline */
+        #event-timeline {
+            width: 90%;
+            max-width: 800px;
+            height: 40px;
+            background-color: rgba(40, 40, 70, 0.5);
+            border-radius: 5px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+            display: none; /* Initially hidden */
+        }
+        #event-timeline.show {
+            display: block;
+        }
+        .timeline-event {
+            position: absolute;
+            width: 8px;
+            height: 100%;
+            background-color: rgba(255, 200, 100, 0.7);
+            cursor: pointer;
+            bottom: 0;
+            transform: translateX(-50%); /* Center the marker */
+            transition: background-color 0.2s ease;
+        }
+        .timeline-event:hover {
+             background-color: rgba(255, 230, 150, 0.9);
+        }
+        .timeline-event-tooltip { /* Using a separate element for tooltip */
+            position: absolute;
+            bottom: 45px; /* Position above the timeline */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(20, 20, 40, 0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            white-space: nowrap;
+            font-size: 0.8em;
+            color: #e0e0ff;
+            display: none; /* Hidden by default */
+            z-index: 95;
+        }
+        .timeline-event:hover .timeline-event-tooltip {
+            display: block;
+        }
+
+
+        /* Improvement 15: Mechanism Toggles */
+        #mechanism-toggles {
+            width: 90%;
+            max-width: 800px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+            justify-content: center;
+        }
+        .toggle-btn {
+            padding: 5px 10px;
+            background-color: rgba(60, 60, 100, 0.5);
+            border: 1px solid #6060a5;
+            border-radius: 15px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #d0d0f0;
+        }
+        .toggle-btn.active {
+            background-color: #6060a5;
+            color: #ffffff;
+            border-color: #8080c5;
+        }
+
+        /* Improvement 20: Research References */
+        #references-panel {
+            width: 90%;
+            max-width: 800px;
+            background-color: rgba(30, 30, 50, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0 20px 0; /* Added bottom margin */
+            font-size: 0.9em;
+            display: none; /* Initially hidden */
+        }
+        #references-panel.show {
+            display: block;
+        }
+         #references-panel h3 {
+            margin-top: 0;
+            color: #c8c8ff;
+            border-bottom: 1px solid #6060a5;
+            padding-bottom: 8px;
+         }
+        .reference-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(100, 100, 150, 0.3);
+        }
+        .reference-item:last-child {
+             border-bottom: none;
+             margin-bottom: 0;
+             padding-bottom: 0;
+        }
+        .reference-title {
+            font-weight: 600;
+            color: #b0b0ff;
+            margin-bottom: 5px;
+        }
+        .reference-citation {
+            font-size: 0.85em;
+            color: #c0c0d0;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5em; }
+            .info-text { font-size: 0.9em;}
+            #concept-panel {
+                width: 90%;
+                max-width: 280px; /* Slightly smaller on mobile */
+                top: 70px;
+                right: 10px;
+                max-height: calc(100vh - 90px);
+                transform: translateX(calc(100% + 30px));
+            }
+             #toggle-concept-panel {
+                top: 10px;
+                right: 10px;
+            }
+            .tutorial-step {
+                max-width: 90%;
+                padding: 15px;
+            }
+            .controls { gap: 10px; }
+            button { padding: 8px 12px; font-size: 0.9em;}
+            .legend { font-size: 0.8em; gap: 10px 15px; }
+            #detail-view { width: 150px; height: 180px; right: 5px; bottom: 5px; }
+            #metrics-container { gap: 10px; }
+            .metric-box { min-width: 120px; padding: 10px;}
+            .metric-value { font-size: 1.1em; }
+            #cancer-stage-indicator { height: 20px; }
+            #cancer-stage-label { font-size: 0.8em; }
+        }
+
+        #intro-panel {
+            position: fixed; /* Changed to fixed */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 10, 0.85);
+            z-index: 200;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px; /* Padding for smaller screens */
+            box-sizing: border-box;
+        }
+        .intro-content {
+            background-color: #2a2a4a;
+            padding: 30px 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            max-width: 600px;
+            width: 100%; /* Ensure it uses available width up to max-width */
+            color: #e8e8ff;
+            border: 1px solid #505080;
+            max-height: 90vh; /* Prevent overflow on short screens */
+            overflow-y: auto; /* Allow scrolling if needed */
+        }
+        .intro-content h2 {
+            margin-top: 0;
+            text-align: center;
+            color: #fff;
+        }
+        .intro-content p {
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+        .intro-content ul {
+            padding-left: 20px;
+            list-style: none; /* Remove default bullets */
+        }
+        .intro-content li {
+            margin-bottom: 10px;
+            position: relative; /* For custom bullets */
+            padding-left: 20px; /* Space for custom bullets */
+        }
+         .intro-content li::before { /* Custom bullets */
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: #8080c5;
+            font-size: 1.2em;
+            line-height: 1;
+        }
+        .intro-content .legend-signal {
+            display: inline-block;
+            vertical-align: middle;
+            margin: 0 2px;
+        }
+        .intro-content button {
+            display: block;
+            margin: 20px auto 0 auto;
+            padding: 12px 25px;
+            font-size: 1.1em;
+        }
+        .intro-buttons-container { /* Container for buttons */
+            display: flex;
+            justify-content: space-around; /* Space out buttons */
+            margin-top: 25px;
+            gap: 15px; /* Add gap between buttons */
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+        }
+         .intro-buttons-container button {
+             margin-top: 0; /* Remove individual margin-top */
+         }
+        canvas {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+    <!-- Add this in the <head> section of your HTML -->
+    <link rel="icon" href="data:,">
+</head>
+<body>
+    <!-- Debug elements -->
+    <div id="debug-info" style="display: none; position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; z-index: 1000; font-family: monospace; font-size: 12px; color: #lime; max-height: 150px; overflow-y: auto; border-radius: 5px; border: 1px solid #555;"></div>
+
+    <!-- Improvement 1: Scientific Concept Panel -->
+    <button id="toggle-concept-panel">Science Concepts</button>
+    <div id="concept-panel">
+        <h3>Bioelectric Concepts in Cancer</h3>
+        <div class="concept-item">
+            <h4>Bioelectric Cell Communication</h4>
+            <p>Cells communicate not just through biochemical signals, but also via electrical signaling. Small changes in voltage across cell membranes (bioelectricity) and the direct sharing of these signals through gap junctions are critical for organizing tissue structure.</p>
+        </div>
+        <div class="concept-item">
+            <h4>Target Morphology Memory</h4>
+            <p>According to Dr. Levin, cells collectively store a "memory" or blueprint of their proper organization. This memory is encoded in bioelectric patterns, allowing cells to coordinate toward a healthy state.</p>
+        </div>
+        <div class="concept-item">
+            <h4>Cancer as Communication Disorder</h4>
+            <p>Cancer may represent a breakdown in communication where cells disconnect from the network, lose access to the target pattern, and form their own disruptive network. This view differs from the traditional genetic mutation model.</p>
+        </div>
+        <div class="concept-item">
+            <h4>Gap Junctions</h4>
+            <p>These are small channels connecting adjacent cells, allowing the passage of ions and small molecules. Healthy cells maintain these connections to coordinate activity, but cancer cells often lose them.</p>
+        </div>
+        <div class="concept-item">
+            <h4>Membrane Potential</h4>
+            <p>The voltage difference across a cell's membrane. Cancer cells typically have depolarized (less negative / more positive) membrane potentials compared to healthy cells.</p>
+        </div>
+        <div class="concept-item">
+            <h4>Contact Inhibition</h4>
+            <p>Healthy cells stop dividing when they contact other cells. Cancer cells lose this inhibition and can grow on top of each other, forming tumors.</p>
+        </div>
+    </div>
+
+    <!-- Improvement 2: Tutorial Overlay -->
+    <div id="tutorial-overlay">
+        <div class="tutorial-step" data-step="1">
+            <h4>Welcome to the Tutorial</h4>
+            <p>This simulation demonstrates how bioelectric communication between cells works and how cancer might represent a communication disorder.</p>
+            <div class="tutorial-controls">
+                <button class="tutorial-nav" data-direction="skip">Skip Tutorial</button>
+                <button class="tutorial-nav" data-direction="next">Next</button>
+            </div>
+        </div>
+        <div class="tutorial-step" data-step="2">
+            <h4>Healthy Cell Network</h4>
+            <p>Blue cells represent normal, healthy cells. They communicate with each other via yellow triangle signals (<span class="legend-signal" style="color: #FFFF99;">▾</span>) that pass through gap junctions (thin lines when enabled).</p>
+            <div class="tutorial-controls">
+                <button class="tutorial-nav" data-direction="prev">Previous</button>
+                <button class="tutorial-nav" data-direction="next">Next</button>
+            </div>
+        </div>
+        <div class="tutorial-step" data-step="3">
+            <h4>Disrupting Communication</h4>
+            <p>Click on a blue cell to disconnect it from the network. It turns red (cancerous) and begins ignoring healthy signals, becoming depolarized.</p>
+            <div class="tutorial-controls">
+                <button class="tutorial-nav" data-direction="prev">Previous</button>
+                <button class="tutorial-nav" data-direction="next">Next</button>
+            </div>
+        </div>
+        <div class="tutorial-step" data-step="4">
+            <h4>Cancer Network Formation</h4>
+            <p>Cancer cells form their own communication network using red square signals (<span class="legend-signal" style="color: #FF6666;">■</span>). These promote proliferation rather than coordination.</p>
+            <div class="tutorial-controls">
+                <button class="tutorial-nav" data-direction="prev">Previous</button>
+                <button class="tutorial-nav" data-direction="next">Next</button>
+            </div>
+        </div>
+        <div class="tutorial-step" data-step="5">
+            <h4>Loss of Contact Inhibition</h4>
+            <p>Note how cancer cells stack on top of each other if 'Cell Stacking' is enabled, having lost the spacing and organization of healthy cells.</p>
+            <div class="tutorial-controls">
+                <button class="tutorial-nav" data-direction="prev">Previous</button>
+                <button class="tutorial-nav" data-direction="finish">Finish</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Improvement 12: Cell Detail View -->
+    <div id="detail-view">
+        <!-- Canvas size adjusted in CSS, set dimensions here -->
+        <canvas id="detail-canvas" width="200" height="220"></canvas>
+    </div>
+
+    <!-- Improvement 4: Cell Lifecycle Diagram (Hidden for now) -->
+    <div id="lifecycle-diagram"></div>
+
+    <!-- Main Intro Panel (Enhanced) -->
+    <div id="intro-panel">
+        <div class="intro-content">
+            <h2>Bioelectric Cell Communication &amp; Cancer</h2>
+            <p>Based on Dr. Michael Levin's research, this simulation explores how cancer might represent a disruption in the bioelectric communication between cells.</p>
+            <ul>
+                <li><b>Healthy Cells (Blue):</b> Use bioelectric signals (<span class="legend-signal" style="color: #FFFF99;">▾</span>) to coordinate with neighbors through gap junctions, maintaining proper tissue organization and polarized membrane potential.</li>
+                <li><b>Click a Cell:</b> Disrupts its connection to the main network, causing it to lose access to the target morphology. It turns <b>Red (Cancer)</b>, becomes depolarized, and forms an independent network.</li>
+                <li><b>Cancer Network:</b> Red cells emit their own signals (<span class="legend-signal" style="color: #FF6666;">■</span>) that encourage proliferation, ignore normal spacing rules (allowing stacking), and grow irregularly.</li>
+            </ul>
+            <p>The simulation illustrates cancer as a communication disorder rather than solely a genetic disease.</p>
+            <div class="intro-buttons-container">
+                <button id="start-button">Start Simulation</button>
+                <button id="start-tutorial">Start Tutorial</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="simulation-header">
+        <h1>Bioelectric Cellular Collective: Cancer as Communication Disorder</h1>
+        <div class="info-text">
+            This simulation visualizes Dr. Michael Levin's bioelectric framework: healthy cells (blue) communicate through bioelectric signals (<span class="legend-signal" style="color: #FFFF99;">▾</span>) to maintain proper organization, while cancer cells (red) form a separate network with their own signals (<span class="legend-signal" style="color: #FF6666;">■</span>), promoting proliferation and disrupting tissue architecture. Click a cell to toggle its state.
+        </div>
+    </div>
+
+    <!-- Improvement 19: Cancer Progression Indicator -->
+    <div id="cancer-stage-indicator">
+        <div id="cancer-stage-bar"></div>
+        <div id="cancer-stage-label">Stage: Normal Tissue</div>
+    </div>
+
+    <div id="status">System Status: Initializing...</div>
+
+    <div id="canvas-container">
+        <div id="tooltip">Cell Info</div>
+        <!-- p5.js canvas will be created here -->
+        <!-- Annotations will be dynamically added here -->
+    </div>
+
+    <!-- Improvement 15: Mechanism Toggles -->
+    <div id="mechanism-toggles">
+        <div class="toggle-btn active" data-feature="gapJunctions" title="Toggle visibility of connections between healthy cells">Gap Junctions</div>
+        <div class="toggle-btn active" data-feature="contactInhibition" title="Toggle whether healthy cells avoid overlapping">Contact Inhibition</div>
+        <div class="toggle-btn active" data-feature="proliferation" title="Toggle cancer cell division">Cell Proliferation</div>
+        <div class="toggle-btn active" data-feature="bioelectricSignals" title="Toggle sending/receiving of all signals">Bioelectric Signals</div>
+        <div class="toggle-btn active" data-feature="cellStacking" title="Toggle whether cancer cells stack on each other">Cell Stacking</div>
+    </div>
+
+    <div class="controls">
+        <button id="pause-button">Pause</button>
+        <div class="slider-container">
+             <label for="speed-slider">Speed:</label>
+             <input type="range" id="speed-slider" min="0.1" max="3.0" value="1.0" step="0.1">
+             <span id="speed-value">1.0x</span>
+        </div>
+        <button id="reset-button">Reset Simulation</button>
+        <button id="toggle-data-panel">Show Data</button>
+        <button id="show-references">References</button>
+    </div>
+
+    <!-- Improvement 17: Enhanced Legend -->
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #87CEFA, #B0E0E6);"></div> Healthy Cell (Coordinated)</div>
+        <div class="legend-item"><div class="legend-color" style="background-color: #FF5070;"></div> Cancer Cell (Disrupted)</div>
+        <div class="legend-item"><span class="legend-signal" style="color: #FFFF99;">▾</span> Coordination Signal</div>
+        <div class="legend-item"><span class="legend-signal" style="color: #FF6666;">■</span> Proliferation Signal</div>
+        <div class="legend-item"><div style="width: 15px; height: 2px; background-color: #88BBFF;"></div> Gap Junction (Visible if Toggled On)</div>
+    </div>
+
+    <!-- Improvement 13: Event Timeline -->
+    <div id="event-timeline">
+        <!-- Event markers will be added here by JS -->
+    </div>
+
+    <!-- Improvement 16: Population Dynamics Graph -->
+    <div id="data-panel">
+        <h3>Cell Population Dynamics</h3>
+        <div id="population-chart-container">
+            <canvas id="population-chart"></canvas>
+            <!-- Fallback text might appear here -->
+        </div>
+
+        <!-- Improvement 18: Metrics Panel -->
+        <div id="metrics-container">
+            <div class="metric-box">
+                <div class="metric-title">Healthy Cells</div>
+                <div class="metric-value" id="healthy-count">0</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Cancer Cells</div>
+                <div class="metric-value" id="cancer-count">0</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Cancer %</div>
+                <div class="metric-value" id="cancer-percent">0%</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Avg. Proliferation</div>
+                <div class="metric-value" id="avg-proliferation">0%</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Signal Density</div>
+                <div class="metric-value" id="signal-rate">0/cell</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Improvement 20: Research References -->
+    <div id="references-panel">
+        <h3>Research Basis</h3>
+        <div class="reference-item">
+            <div class="reference-title">Bioelectric Signaling in Development and Cancer</div>
+            <div class="reference-citation">Levin, M. (2014). Molecular bioelectricity: how endogenous voltage potentials control cell behavior and instruct pattern regulation in vivo. Molecular Biology of the Cell, 25(24), 3835-3850. <a href="https://pubmed.ncbi.nlm.nih.gov/25425552/" target="_blank" rel="noopener noreferrer">[Link]</a></div>
+        </div>
+        <div class="reference-item">
+            <div class="reference-title">Gap Junctions in Cell Communication</div>
+            <div class="reference-citation">Mathews, J., & Levin, M. (2017). Gap junctional signaling in pattern regulation: physiological network connectivity instructs growth and form. Developmental Neurobiology, 77(5), 646-673. <a href="https://pubmed.ncbi.nlm.nih.gov/27860314/" target="_blank" rel="noopener noreferrer">[Link]</a></div>
+        </div>
+        <div class="reference-item">
+            <div class="reference-title">Cancer as a Communication Disorder</div>
+            <div class="reference-citation">Chernet, B. T., & Levin, M. (2013). Endogenous voltage potentials and the microenvironment: bioelectric signals that reveal, guide, and normalize cancer development. Journal of Clinical Investigation Insight, 1(1). <a href="https://insight.jci.org/articles/view/85201" target="_blank" rel="noopener noreferrer">[Link]</a> Note: Citation slightly adapted for linkable reference.</div>
+        </div>
+    </div>
+
+
+    <script>
+        console.log("Script starting...");
+
+        // Global debug function
+        function debugLog(message) {
+            console.log(message);
+            const debugElement = document.getElementById('debug-info');
+            if (debugElement && debugElement.style.display !== 'none') {
+                const timestamp = new Date().toLocaleTimeString();
+                const div = document.createElement('div');
+                div.textContent = `[${timestamp}] ${message}`;
+                debugElement.appendChild(div);
+                // Keep only last 15 messages
+                while (debugElement.children.length > 15) {
+                    debugElement.removeChild(debugElement.firstChild);
+                }
+                 debugElement.scrollTop = debugElement.scrollHeight; // Auto-scroll
+            }
+        }
+
+        // Enable debug mode with key press (Ctrl+D)
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'd' && event.ctrlKey) {
+                event.preventDefault(); // Prevent browser default behavior (e.g., bookmark)
+                const debugElement = document.getElementById('debug-info');
+                const wasHidden = debugElement.style.display === 'none';
+                debugElement.style.display = wasHidden ? 'block' : 'none';
+                debugLog(`Debug info ${wasHidden ? 'enabled' : 'disabled'}`);
+            }
+        });
+
+        // Global simulation variables
+        window.simulationVars = {
+            cells: [],
+            messages: [],
+            hoveredCell: null,
+            selectedCell: null,
+            isPaused: true, // Start paused until intro panel is dismissed
+            simulationSpeed: 1.0,
+            showGapJunctions: true,
+            events: [],
+            features: {
+                gapJunctions: true,
+                contactInhibition: true,
+                proliferation: true,
+                bioelectricSignals: true,
+                cellStacking: true
+            },
+            populationHistory: {
+                timestamps: [],
+                healthyCounts: [],
+                cancerCounts: []
+            },
+            initialized: false, // Track if p5 setup has run
+            maxCells: 0, // Will be set in setup
+            canvasElement: null, // Reference to p5 canvas element
+            eventFlags: { // Track one-time events
+                firstCancer: false,
+                firstProliferation: false,
+                cancer25: false,
+                cancer50: false
+            }
+        };
+
+        // --- Set up direct DOM element event handlers ---
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog("DOM loaded, setting up button handlers");
+
+            // Start Simulation button
+            document.getElementById('start-button').addEventListener('click', function() {
+                debugLog("Start button clicked");
+                document.getElementById('intro-panel').style.display = 'none';
+                if (window.simulationVars.initialized) { // Only unpause if setup has run
+                    window.simulationVars.isPaused = false;
+                    document.getElementById('pause-button').textContent = 'Pause';
+                    window.addEvent("Simulation Started", "User started the simulation");
+                    debugLog("Simulation unpaused");
+                } else {
+                    debugLog("Simulation not yet initialized, will start on setup");
+                }
+            });
+
+            // Start Tutorial button
+            document.getElementById('start-tutorial').addEventListener('click', function() {
+                debugLog("Tutorial button clicked");
+                document.getElementById('intro-panel').style.display = 'none';
+                window.simulationVars.isPaused = true; // Ensure paused for tutorial
+                document.getElementById('pause-button').textContent = 'Play';
+
+                const tutorialOverlay = document.getElementById('tutorial-overlay');
+                tutorialOverlay.style.display = 'flex'; // Use flex for centering
+
+                // Show first step
+                const firstStep = document.querySelector('.tutorial-step[data-step="1"]');
+                if (firstStep) {
+                    firstStep.classList.add('active');
+                    debugLog("Tutorial step 1 shown");
+                } else {
+                     debugLog("Error: Tutorial step 1 not found");
+                }
+                window.addEvent("Tutorial Started", "User started the tutorial");
+            });
+
+            // Pause button
+            document.getElementById('pause-button').addEventListener('click', function() {
+                window.simulationVars.isPaused = !window.simulationVars.isPaused;
+                this.textContent = window.simulationVars.isPaused ? 'Play' : 'Pause';
+                debugLog(`Simulation ${window.simulationVars.isPaused ? 'paused' : 'unpaused'}`);
+            });
+
+            // Reset button
+            document.getElementById('reset-button').addEventListener('click', function() {
+                debugLog("Reset button clicked");
+                if (window.simulationVars.initialized && window.p5Instance) {
+                    window.p5Instance.resetSimulation(); // Call reset function within p5 sketch
+                } else {
+                    debugLog("Cannot reset: simulation not initialized or p5 instance missing.");
+                }
+            });
+
+            // Toggle Concept Panel button
+            document.getElementById('toggle-concept-panel').addEventListener('click', function() {
+                const panel = document.getElementById('concept-panel');
+                panel.classList.toggle('show');
+                debugLog(`Concept panel ${panel.classList.contains('show') ? 'shown' : 'hidden'}`);
+            });
+
+            // Toggle Data Panel button
+            document.getElementById('toggle-data-panel').addEventListener('click', function() {
+                const panel = document.getElementById('data-panel');
+                const isShowing = panel.classList.toggle('show');
+                this.textContent = isShowing ? 'Hide Data' : 'Show Data';
+                debugLog(`Data panel ${isShowing ? 'shown' : 'hidden'}`);
+                 // Trigger chart update when shown if needed (or let draw loop handle it)
+                 if (isShowing && window.populationChart && typeof window.populationChart.update === 'function') {
+                     // Ensure chart has data immediately if available
+                    if (window.p5Instance && window.p5Instance.updatePopulationChart) {
+                        window.p5Instance.updatePopulationChart(true); // Force update
+                    }
+                 }
+            });
+
+            // Show References button
+            document.getElementById('show-references').addEventListener('click', function() {
+                const panel = document.getElementById('references-panel');
+                const isShowing = panel.classList.toggle('show');
+                this.textContent = isShowing ? 'Hide References' : 'References';
+                 debugLog(`References panel ${isShowing ? 'shown' : 'hidden'}`);
+            });
+
+            // Speed slider
+            document.getElementById('speed-slider').addEventListener('input', function() {
+                const speed = parseFloat(this.value);
+                window.simulationVars.simulationSpeed = speed;
+                document.getElementById('speed-value').textContent = speed.toFixed(1) + 'x';
+                // No debug log here to avoid flooding console
+            });
+
+            // Tutorial navigation buttons
+            const tutorialNavButtons = document.querySelectorAll('.tutorial-nav');
+            tutorialNavButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const direction = this.getAttribute('data-direction');
+                    handleTutorialNavigation(direction);
+                });
+            });
+
+            // Feature toggle buttons
+            const toggleButtons = document.querySelectorAll('.toggle-btn');
+            toggleButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const feature = this.getAttribute('data-feature');
+                    if (window.simulationVars.features.hasOwnProperty(feature)) {
+                        window.simulationVars.features[feature] = !window.simulationVars.features[feature];
+                        this.classList.toggle('active');
+                        debugLog(`Feature '${feature}' toggled ${window.simulationVars.features[feature] ? 'on' : 'off'}`);
+
+                        // Special handling for visual features like gap junctions
+                        if (feature === 'gapJunctions') {
+                            window.simulationVars.showGapJunctions = window.simulationVars.features.gapJunctions;
+                        }
+                    } else {
+                        debugLog(`Error: Feature '${feature}' not found in simulationVars.features`);
+                    }
+                });
+            });
+        });
+
+        // Tutorial navigation function
+        function handleTutorialNavigation(direction) {
+            debugLog(`Tutorial navigation: ${direction}`);
+            const tutorialOverlay = document.getElementById('tutorial-overlay');
+            const currentStepElement = tutorialOverlay.querySelector('.tutorial-step.active');
+            if (!currentStepElement) {
+                debugLog("Error: No active tutorial step found.");
+                tutorialOverlay.style.display = 'none'; // Hide overlay if state is broken
+                return;
+            }
+
+            const currentStepNum = parseInt(currentStepElement.getAttribute('data-step'));
+            currentStepElement.classList.remove('active');
+
+            if (direction === 'skip' || direction === 'finish') {
+                tutorialOverlay.style.display = 'none';
+                window.simulationVars.isPaused = false; // Unpause after tutorial
+                document.getElementById('pause-button').textContent = 'Pause';
+                debugLog("Tutorial finished or skipped. Simulation unpaused.");
+                 if (window.addEvent) window.addEvent("Tutorial Finished", `Tutorial ${direction}`);
+                return;
+            }
+
+            let nextStepNum;
+            if (direction === 'next') nextStepNum = currentStepNum + 1;
+            else if (direction === 'prev') nextStepNum = currentStepNum - 1;
+            else {
+                 debugLog(`Error: Invalid tutorial direction '${direction}'`);
+                 return; // Should not happen
+            }
+
+
+            const nextStepElement = tutorialOverlay.querySelector(`.tutorial-step[data-step="${nextStepNum}"]`);
+            if (nextStepElement) {
+                nextStepElement.classList.add('active');
+                debugLog(`Tutorial step ${nextStepNum} shown`);
+            } else {
+                // If no next step (e.g., going prev from step 1 or next from last step), just hide
+                tutorialOverlay.style.display = 'none';
+                window.simulationVars.isPaused = false; // Unpause
+                document.getElementById('pause-button').textContent = 'Pause';
+                debugLog("Tutorial ended (no more steps in that direction). Simulation unpaused.");
+                 if (window.addEvent) window.addEvent("Tutorial Finished", "Reached end of steps");
+            }
+        }
+
+        // --- p5.js Sketch ---
+        let sketch = function(p) {
+            // Constants
+            const GRID_COLS = 26;
+            const GRID_ROWS = 17;
+            const HEALTHY_MEMBRANE_POTENTIAL = -70; // millivolts (polarized)
+            const CANCER_MEMBRANE_POTENTIAL = -20;  // millivolts (depolarized)
+            const PROLIFERATION_ENERGY_MAX = 1100; // Energy needed to divide
+            const PROLIFERATION_BOOST = 160; // Energy gain from signal
+            const HEALTHY_EMIT_RATE = 0.009; // Base chance per frame per cell
+            const CANCER_EMIT_RATE = 0.015; // Base chance per frame per cell
+            const MESSAGE_LIFETIME = 100; // Frames a message lives
+            const MAX_CELL_DENSITY_FACTOR = 3.0; // Allow cells up to 3x initial grid count
+
+            // Variables from simulationVars (local copies for easier access in sketch scope)
+            let cells = window.simulationVars.cells;
+            let messages = window.simulationVars.messages;
+            let isPaused = window.simulationVars.isPaused;
+            let simulationSpeed = window.simulationVars.simulationSpeed;
+            let hoveredCell = window.simulationVars.hoveredCell;
+            let selectedCell = window.simulationVars.selectedCell;
+            let features = window.simulationVars.features;
+            let showGapJunctions = window.simulationVars.showGapJunctions;
+
+            // Local sketch variables
+            let cellWidth, cellHeight;
+            let healthyTargetColorMin, healthyTargetColorMax;
+            let cancerColor;
+            let nucleusHealthyColor, nucleusCancerColor;
+            let communicationRadius;
+            let maxCells;
+            let canvas; // p5 canvas object
+            let statusDiv;
+            let tooltipDiv;
+            let lastUpdateTime = 0;
+            let lastChartUpdateTime = 0;
+            let detailCtx = null; // Context for detail view canvas
+            let populationChart = null; // Chart.js instance or fallback object
+
+            // --- Setup ---
+            p.setup = function() {
+                debugLog("p5.js setup started");
+
+                // Determine canvas size
+                const container = document.getElementById('canvas-container');
+                let canvasWidth = Math.min(container.clientWidth || window.innerWidth * 0.9, 950);
+                // Calculate height based on aspect ratio of grid
+                cellWidth = canvasWidth / GRID_COLS;
+                canvasHeight = cellWidth * GRID_ROWS; // Maintain aspect ratio
+
+                // Ensure minimum cell size for visibility
+                if (cellWidth < 10) {
+                    cellWidth = 10;
+                    canvasWidth = cellWidth * GRID_COLS;
+                    canvasHeight = cellWidth * GRID_ROWS;
+                    debugLog("Adjusted canvas size for minimum cell width");
+                }
+
+
+                canvas = p.createCanvas(canvasWidth, canvasHeight);
+                canvas.parent('canvas-container');
+                window.simulationVars.canvasElement = canvas.elt; // Store canvas element reference
+                p.pixelDensity(1); // Ensure consistent drawing across displays
+
+                cellHeight = canvasHeight / GRID_ROWS; // Recalculate cell height based on final canvas height
+                communicationRadius = Math.min(cellWidth, cellHeight) * 1.9;
+                maxCells = Math.floor(GRID_COLS * GRID_ROWS * MAX_CELL_DENSITY_FACTOR);
+                window.simulationVars.maxCells = maxCells; // Update global var
+
+                // Setup colors using p5.color
+                healthyTargetColorMin = p.color(150, 210, 255, 230);
+                healthyTargetColorMax = p.color(100, 180, 240, 210);
+                cancerColor = p.color(255, 80, 112, 255); // More opaque cancer color
+                nucleusHealthyColor = p.color(80, 120, 180, 200);
+                nucleusCancerColor = p.color(90, 35, 55, 220);
+
+                // Get references to HTML elements
+                statusDiv = p.select('#status');
+                tooltipDiv = p.select('#tooltip');
+
+                // Initialize detail view canvas context
+                const detailCanvas = document.getElementById('detail-canvas');
+                if (detailCanvas) {
+                    detailCtx = detailCanvas.getContext('2d');
+                     debugLog("Detail view canvas context obtained.");
+                } else {
+                     debugLog("Warning: Detail view canvas not found.");
+                }
+
+                // Initialize cells
+                initializeCells();
+
+                // Setup population chart
+                setupPopulationChart();
+
+                // Update status display
+                updateStatus();
+
+                // Log initialization completion
+                window.simulationVars.initialized = true;
+                window.p5Instance = p; // Make p5 instance globally accessible for reset etc.
+                debugLog(`p5.js setup completed. Canvas: ${p.width}x${p.height}, Max Cells: ${maxCells}`);
+
+                // Add initial event
+                addEvent("Simulation Initialized", "System ready");
+
+                // If intro panel was dismissed before setup, start simulation now
+                if (document.getElementById('intro-panel').style.display === 'none' &&
+                    !document.getElementById('tutorial-overlay').style.display !== 'none') {
+                    window.simulationVars.isPaused = false;
+                    document.getElementById('pause-button').textContent = 'Pause';
+                    debugLog("Initial state is unpaused (intro dismissed pre-setup)");
+                } else {
+                     window.simulationVars.isPaused = true; // Ensure it starts paused if intro/tutorial is up
+                     document.getElementById('pause-button').textContent = 'Play';
+                     debugLog("Initial state is paused (intro/tutorial active)");
+                }
+
+            }; // --- End of p.setup ---
+
+            // --- Main Draw Loop ---
+            p.draw = function() {
+                // Sync global variables that might change outside the sketch
+                isPaused = window.simulationVars.isPaused;
+                simulationSpeed = window.simulationVars.simulationSpeed;
+                features = window.simulationVars.features;
+                showGapJunctions = window.simulationVars.showGapJunctions;
+                selectedCell = window.simulationVars.selectedCell; // Sync selected cell
+
+                p.background(26, 26, 44); // Dark background
+                hoveredCell = null; // Reset hover state each frame
+
+                const scaledSpeed = simulationSpeed * (p.deltaTime / (1000/60)); // Scale updates by deltaTime and speed slider
+
+                if (!isPaused) {
+                    // --- Update Messages ---
+                    if (features.bioelectricSignals) {
+                        for (let i = messages.length - 1; i >= 0; i--) {
+                            messages[i].update(scaledSpeed);
+                            if (messages[i].isDone()) {
+                                let targetCell = messages[i].target;
+                                // Check if target cell still exists
+                                if (targetCell && cells.find(c => c.id === targetCell.id)) {
+                                    targetCell.receiveMessage(messages[i].type, messages[i].originatorId);
+                                }
+                                messages.splice(i, 1); // Remove message
+                            }
+                        }
+                    } else {
+                        // Clear messages if signals are turned off
+                         if (messages.length > 0) {
+                            messages = [];
+                            window.simulationVars.messages = messages;
+                         }
+                    }
+
+
+                    // --- Update Cells & Emit Messages ---
+                    let newCells = [];
+                    // Reset signal counts before update loop
+                    for (let cell of cells) {
+                         cell.signalsReceivedThisPeriod = 0;
+                    }
+
+                    for (let i = cells.length - 1; i >= 0; i--) {
+                        const cell = cells[i];
+                        cell.update(cells, scaledSpeed); // Pass scaled speed
+
+                        // Check for cell death (e.g., if update returns false) - Optional future feature
+                        // if (!cell.isAlive) { cells.splice(i, 1); continue; }
+
+                        // Emit Messages if signals enabled
+                        if (features.bioelectricSignals) {
+                            let emitCheck = p.random(1);
+                            let baseEmitRate = cell.isCancer ? CANCER_EMIT_RATE : HEALTHY_EMIT_RATE;
+                            // Adjust emit rate slightly by speed, but prevent excessive messages at high speed
+                            let effectiveEmitRate = baseEmitRate * Math.sqrt(simulationSpeed); // Use sqrt to dampen effect
+
+                            if (emitCheck < effectiveEmitRate * (p.deltaTime / (1000/60)) ) { // Scale by frame duration
+                                if (cell.isCancer) {
+                                    cell.emitMessage(cells, 'PROLIFERATE');
+                                } else {
+                                    cell.emitMessage(cells, 'COORDINATE');
+                                }
+                            }
+                        }
+
+                        // Check for Proliferation (spawned cell stored in cell.newlySpawned)
+                        if (cell.newlySpawned) {
+                            newCells.push(cell.newlySpawned);
+                            cell.newlySpawned = null; // Clear reference after collecting
+                        }
+                    }
+
+                    // --- Add Newly Proliferated Cells & Apply Push Forces ---
+                    if (newCells.length > 0) {
+                        cells.push(...newCells); // Add new cells to the main array
+
+                        // Detect first cancer proliferation event (only if proliferation feature is on)
+                        if (features.proliferation && !window.simulationVars.eventFlags.firstProliferation && newCells.some(c => c.isCancer)) {
+                            addEvent("Cancer Proliferation", "First cancer cells dividing");
+                            showAnnotation(newCells[0].pos.x, newCells[0].pos.y, "Cancer cell division: loss of growth control");
+                            window.simulationVars.eventFlags.firstProliferation = true;
+                        }
+
+                        // Apply push forces after new cells are added
+                        // Use a simplified push mechanism based on overlap
+                         applyOverlapForces(cells, scaledSpeed);
+
+                    } // End if (newCells.length > 0)
+
+
+                    // --- Limit Cell Count ---
+                    while (cells.length > maxCells) {
+                        // Prioritize removing older healthy cells first, then older cancer cells
+                        let healthyIndices = cells.reduce((acc, c, idx) => { if (!c.isCancer) acc.push(idx); return acc; }, []);
+                        let cancerIndices = cells.reduce((acc, c, idx) => { if (c.isCancer) acc.push(idx); return acc; }, []);
+
+                        if (healthyIndices.length > 0) {
+                            cells.splice(healthyIndices[0], 1); // Remove oldest healthy cell
+                        } else if (cancerIndices.length > 0) {
+                            cells.splice(cancerIndices[0], 1); // Remove oldest cancer cell if no healthy ones left
+                        } else {
+                            break; // Should not happen if maxCells > 0
+                        }
+                    }
+
+
+                    // --- Periodic Updates --- (Less frequent than every frame)
+                    if (p.frameCount % 30 === 0) { // Roughly every half second
+                        updateStatus();
+
+                        // Update population chart if visible
+                        if (document.getElementById('data-panel').classList.contains('show')) {
+                            updatePopulationChart();
+                        }
+                         // Trigger threshold events
+                         checkThresholdEvents();
+                    }
+
+                } // End if(!isPaused)
+
+                // --- Always Draw (Even When Paused) ---
+
+                // Draw Gap Junctions first (if enabled)
+                if (showGapJunctions && features.gapJunctions) {
+                    drawGapJunctions();
+                }
+
+                // Draw Messages
+                if (features.bioelectricSignals) {
+                    for (let msg of messages) msg.display();
+                }
+
+                // Sort cells by Y-position for pseudo-3D stacking effect if enabled
+                if (features.cellStacking) {
+                    cells.sort((a, b) => a.pos.y - b.pos.y);
+                }
+
+                // Draw Cells
+                let currentHovered = null; // Track hovered cell in this frame
+                for (let cell of cells) {
+                    cell.display();
+                    // Check for hover (check after drawing so top cells get priority if stacking)
+                    // Use square distance for efficiency
+                    let distSq = (p.mouseX - cell.pos.x)**2 + (p.mouseY - cell.pos.y)**2;
+                    if (distSq < (cell.size / 2)**2) {
+                         // If multiple cells overlap, the one drawn last (higher Y if sorted) will be hovered
+                        currentHovered = cell;
+                    }
+                }
+                hoveredCell = currentHovered; // Update hovered cell state
+
+
+                // Display Tooltip
+                displayTooltip();
+
+                // Detail view for selected cell
+                if (selectedCell) {
+                    const detailViewDiv = document.getElementById('detail-view');
+                    if (detailViewDiv.classList.contains('show')) {
+                         drawDetailView(selectedCell);
+                    }
+                }
+
+                // Update global simulation state variables (arrays are modified in place, others need update)
+                window.simulationVars.cells = cells;
+                window.simulationVars.messages = messages;
+                window.simulationVars.hoveredCell = hoveredCell;
+                // selectedCell is synced at the start of draw and on click
+
+            }; // --- End of p.draw ---
+
+
+             // --- Apply Overlap Forces ---
+            function applyOverlapForces(allCells, speedFactor) {
+                const K_HEALTHY_REPEL = 0.08; // Repulsion strength between healthy cells
+                const K_CANCER_STACK = 0.005; // Weak repulsion between cancer cells (allows stacking)
+                const K_CANCER_PUSH = 0.12; // Repulsion strength cancer pushes healthy
+
+                for (let i = 0; i < allCells.length; i++) {
+                    for (let j = i + 1; j < allCells.length; j++) {
+                        let cellA = allCells[i];
+                        let cellB = allCells[j];
+
+                        let diff = p5.Vector.sub(cellB.pos, cellA.pos);
+                        let distSq = diff.magSq();
+                        let combinedRadius = (cellA.size + cellB.size) * 0.5;
+                        let combinedRadiusSq = combinedRadius * combinedRadius;
+
+                        if (distSq < combinedRadiusSq && distSq > 0.001) { // Check for overlap
+                            let distance = Math.sqrt(distSq);
+                            let overlap = combinedRadius - distance;
+                            let forceMagnitude = 0;
+
+                            // Determine force based on cell types and features
+                            if (!cellA.isCancer && !cellB.isCancer) {
+                                // Healthy-Healthy: Apply if contact inhibition is on
+                                if (features.contactInhibition) {
+                                    forceMagnitude = overlap * K_HEALTHY_REPEL;
+                                }
+                            } else if (cellA.isCancer && cellB.isCancer) {
+                                // Cancer-Cancer: Apply weak force if stacking is off, otherwise very weak
+                                if (!features.cellStacking) {
+                                    forceMagnitude = overlap * K_HEALTHY_REPEL; // Repel like healthy if stacking off
+                                } else {
+                                    forceMagnitude = overlap * K_CANCER_STACK; // Allow stacking
+                                }
+                            } else {
+                                // Cancer-Healthy: Cancer pushes healthy away strongly
+                                // Healthy is pushed regardless of contactInhibition setting
+                                forceMagnitude = overlap * K_CANCER_PUSH;
+                            }
+
+                            if (forceMagnitude > 0) {
+                                let force = diff.copy();
+                                force.setMag(forceMagnitude * speedFactor); // Scale force by speed
+                                cellB.applyForce(force);
+                                cellA.applyForce(force.mult(-1));
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            // --- Mouse Events ---
+            p.mousePressed = function() {
+                // Ignore clicks if intro or tutorial is active
+                const introPanel = document.getElementById('intro-panel');
+                const tutorialOverlay = document.getElementById('tutorial-overlay');
+                
+                if ((introPanel && introPanel.style.display !== 'none') || 
+                    (tutorialOverlay && tutorialOverlay.style.display === 'flex')) {
+                    return;
+                }
+
+                // Check if click is inside the canvas
+                if (p.mouseX > 0 && p.mouseX < p.width && p.mouseY > 0 && p.mouseY < p.height) {
+                    let clickedCell = null;
+                    // If stacking, check from top (last drawn) to bottom
+                    let cellsToCheck = features.cellStacking ? [...cells].reverse() : cells;
+
+                    for (let cell of cellsToCheck) {
+                        let distSq = (p.mouseX - cell.pos.x)**2 + (p.mouseY - cell.pos.y)**2;
+                        if (distSq < (cell.size / 2)**2) {
+                            clickedCell = cell;
+                            break; // Found the topmost clicked cell
+                        }
+                    }
+
+                    if (clickedCell) {
+                        debugLog(`Cell clicked: ${clickedCell.id}, IsCancer: ${clickedCell.isCancer}`);
+                        // Toggle cell state
+                        let wasHealthy = !clickedCell.isCancer;
+                        clickedCell.isCancer = !clickedCell.isCancer;
+                        clickedCell.signalsReceivedThisPeriod = 0; // Reset signal count
+                        clickedCell.stateChangeFlashTimer = 15; // Visual feedback
+
+                        if (clickedCell.isCancer) {
+                            // --- Transition to Cancer ---
+                            clickedCell.targetColor = cancerColor;
+                            clickedCell.nucleusColor = nucleusCancerColor;
+                            clickedCell.proliferationEnergy = 0; // Reset energy
+                            clickedCell.membranePotential = p.lerp(clickedCell.membranePotential, CANCER_MEMBRANE_POTENTIAL, 0.5);
+                            clickedCell.generateIrregularityVectors(true);
+
+                            if (wasHealthy && !window.simulationVars.eventFlags.firstCancer) {
+                                showAnnotation(clickedCell.pos.x, clickedCell.pos.y, "Communication Disrupted! Cell transitioning to cancer state.");
+                                addEvent("First Cancer Cell", "User created the first cancer cell");
+                                window.simulationVars.eventFlags.firstCancer = true;
+                            }
+                        } else {
+                            // --- Transition back to Healthy ---
+                            let healedColor = p.lerpColor(healthyTargetColorMin, healthyTargetColorMax, p.random(0.3, 0.7));
+                            clickedCell.targetColor = healedColor;
+                            clickedCell.nucleusColor = nucleusHealthyColor;
+                            clickedCell.proliferationEnergy = 0;
+                            clickedCell.membranePotential = p.lerp(clickedCell.membranePotential, HEALTHY_MEMBRANE_POTENTIAL, 0.5);
+                            clickedCell.resetIrregularityVectors();
+                        }
+
+                        // Select this cell for detail view
+                        window.simulationVars.selectedCell = clickedCell;
+                        document.getElementById('detail-view').classList.add('show');
+                        updateStatus();
+                    } else {
+                        // Clicked on background - deselect cell
+                        window.simulationVars.selectedCell = null;
+                        document.getElementById('detail-view').classList.remove('show');
+                    }
+                    return false; // Prevent default browser action
+                }
+            }; // --- End of p.mousePressed ---
+
+
+            // --- Initialize Cells ---
+            function initializeCells() {
+                debugLog("Initializing cells...");
+                cells = [];
+                messages = [];
+                let cellCounter = 0;
+                for (let j = 0; j < GRID_ROWS; j++) {
+                    for (let i = 0; i < GRID_COLS; i++) {
+                        // Add slight jitter to position
+                        let x = i * cellWidth + cellWidth / 2 + p.random(-cellWidth * 0.1, cellWidth * 0.1);
+                        let y = j * cellHeight + cellHeight / 2 + p.random(-cellHeight * 0.1, cellHeight * 0.1);
+                        // Ensure cells start within bounds slightly
+                        x = p.constrain(x, cellWidth * 0.2, p.width - cellWidth * 0.2);
+                        y = p.constrain(y, cellHeight * 0.2, p.height - cellHeight * 0.2);
+
+                        let startColor = p.lerpColor(healthyTargetColorMin, healthyTargetColorMax, p.random(0.3, 0.7));
+                        cells.push(new Cell(x, y, startColor, `H-${cellCounter++}`));
+                    }
+                }
+                debugLog(`Initialized ${cells.length} healthy cells.`);
+                window.simulationVars.selectedCell = null; // Deselect any cell
+                 document.getElementById('detail-view').classList.remove('show');
+
+                 // Reset event flags
+                 window.simulationVars.eventFlags = {
+                    firstCancer: false,
+                    firstProliferation: false,
+                    cancer25: false,
+                    cancer50: false
+                 };
+
+                // Update global arrays
+                window.simulationVars.cells = cells;
+                window.simulationVars.messages = messages;
+            }
+            // Make this available globally via p5 instance
+            p.resetSimulation = function() {
+                 debugLog("p.resetSimulation() called.");
+                 initializeCells();
+                 window.simulationVars.isPaused = false; // Start running after reset
+                 document.getElementById('pause-button').textContent = 'Pause';
+                 document.getElementById('speed-slider').value = 1.0;
+                 window.simulationVars.simulationSpeed = 1.0;
+                 document.getElementById('speed-value').textContent = '1.0x';
+                 document.getElementById('intro-panel').style.display = 'none'; // Ensure intro is hidden
+                 document.getElementById('tutorial-overlay').style.display = 'none'; // Ensure tutorial is hidden
+
+                 resetPopulationHistory(); // Clear chart data
+                 if (populationChart && populationChart.destroy) {
+                      populationChart.destroy(); // Destroy old chart instance
+                 }
+                 setupPopulationChart(); // Recreate chart
+
+                 window.simulationVars.events = []; // Clear events
+                 updateEventTimeline(); // Update timeline display (clear it)
+
+                 updateStatus(); // Update counts and labels
+                 p.frameCount = 0; // Reset frameCount for timing events
+
+                 // Reset mechanism toggles to default active state
+                 const toggleButtons = document.querySelectorAll('.toggle-btn');
+                 toggleButtons.forEach(btn => {
+                     const feature = btn.getAttribute('data-feature');
+                     window.simulationVars.features[feature] = true; // Reset feature state
+                     btn.classList.add('active'); // Reset button style
+                     if (feature === 'gapJunctions') {
+                         window.simulationVars.showGapJunctions = true;
+                     }
+                 });
+
+                 addEvent("Simulation Reset", "User reset the simulation");
+                 debugLog("Simulation reset complete.");
+            }
+
+            // --- Status Updates ---
+            function updateStatus() {
+                if (!statusDiv) return; // Guard against statusDiv not being ready
+
+                let healthyCount = 0;
+                let cancerCount = 0;
+                for(let cell of cells) {
+                    if (cell.isCancer) cancerCount++;
+                    else healthyCount++;
+                }
+                let total = healthyCount + cancerCount;
+                let statusText = "";
+
+                if (total === 0) statusText = "System Empty.";
+                else if (cancerCount === 0) statusText = `All ${healthyCount} Cells Healthy - Coordinated Network.`;
+                else if (healthyCount === 0) statusText = `All ${cancerCount} Cells Disrupted - Cancer Network Dominance.`;
+                else {
+                    let cancerPercent = (cancerCount / total) * 100;
+                    if (cancerPercent < 10)
+                        statusText = `${healthyCount} Healthy, ${cancerCount} Disrupted (${cancerPercent.toFixed(1)}%) - Early Disruption.`;
+                    else if (cancerPercent < 50)
+                        statusText = `${healthyCount} Healthy, ${cancerCount} Disrupted (${cancerPercent.toFixed(1)}%) - Growing Cancer Network.`;
+                    else
+                        statusText = `${healthyCount} Healthy, ${cancerCount} Disrupted (${cancerPercent.toFixed(1)}%) - Advanced Progression.`;
+                }
+                statusDiv.html(`Status: ${statusText}`);
+
+                // Update cancer stage indicator
+                updateCancerStageIndicator(healthyCount, cancerCount);
+
+                // Update metrics panel if visible
+                if (document.getElementById('data-panel').classList.contains('show')) {
+                    updateMetricsPanel(healthyCount, cancerCount);
+                }
+            }
+
+             // --- Check Threshold Events ---
+            function checkThresholdEvents() {
+                let healthyCount = 0;
+                let cancerCount = 0;
+                for (let cell of cells) {
+                    if (cell.isCancer) cancerCount++;
+                    else healthyCount++;
+                }
+                let total = healthyCount + cancerCount;
+                if (total === 0) return;
+
+                let cancerPercent = (cancerCount / total) * 100;
+
+                // First time reaching 25% cancer
+                if (!window.simulationVars.eventFlags.cancer25 && cancerPercent >= 25) {
+                    addEvent("25% Cancer", "Cancer at 25% population");
+                    showAnnotation(p.width / 2, p.height * 0.3, "Cancer network expanding");
+                    window.simulationVars.eventFlags.cancer25 = true;
+                }
+
+                // First time reaching 50% cancer
+                if (!window.simulationVars.eventFlags.cancer50 && cancerPercent >= 50) {
+                    addEvent("50% Cancer", "Cancer at 50% population");
+                    showAnnotation(p.width / 2, p.height * 0.6, "Cancer dominating tissue");
+                    window.simulationVars.eventFlags.cancer50 = true;
+                }
+            }
+
+
+            // --- Cancer Stage Indicator ---
+            function updateCancerStageIndicator(healthyCount, cancerCount) {
+                let total = healthyCount + cancerCount;
+                const stageBar = document.getElementById('cancer-stage-bar');
+                const stageLabel = document.getElementById('cancer-stage-label');
+                if (!stageBar || !stageLabel) return; // Exit if elements not found
+
+                let cancerPercent = total > 0 ? (cancerCount / total) * 100 : 0;
+                stageBar.style.width = cancerPercent + '%';
+
+                let stageText;
+                if (cancerPercent === 0) stageText = "Stage: Normal Tissue";
+                else if (cancerPercent < 5) stageText = "Stage: Isolated Disruption";
+                else if (cancerPercent < 15) stageText = "Stage: Early Local Growth";
+                else if (cancerPercent < 40) stageText = "Stage: Established Cancer Network";
+                else if (cancerPercent < 70) stageText = "Stage: Advanced Network Growth";
+                else stageText = "Stage: Network Dominance";
+
+                stageLabel.textContent = stageText;
+            }
+
+            // --- Metrics Panel ---
+            function updateMetricsPanel(healthyCount, cancerCount) {
+                document.getElementById('healthy-count').textContent = healthyCount;
+                document.getElementById('cancer-count').textContent = cancerCount;
+
+                let total = healthyCount + cancerCount;
+                let cancerPercent = total > 0 ? Math.round((cancerCount / total) * 100) : 0;
+                document.getElementById('cancer-percent').textContent = cancerPercent + '%';
+
+                // Calculate average proliferation energy for *cancer cells only*
+                let totalProlifEnergy = 0;
+                let numCancerCells = 0;
+                for (let cell of cells) {
+                    if (cell.isCancer) {
+                        totalProlifEnergy += cell.proliferationEnergy;
+                        numCancerCells++;
+                    }
+                }
+                let avgProliferation = numCancerCells > 0 ? Math.round((totalProlifEnergy / numCancerCells) / PROLIFERATION_ENERGY_MAX * 100) : 0;
+                // Cap display at 100% even if energy slightly exceeds max before division
+                avgProliferation = Math.min(avgProliferation, 100);
+                document.getElementById('avg-proliferation').textContent = avgProliferation + '%';
+
+                // Calculate signal density (average signals per cell)
+                let signalDensity = total > 0 ? (messages.length / total) : 0;
+                document.getElementById('signal-rate').textContent = signalDensity.toFixed(2) + '/cell';
+            }
+
+            // --- Population Dynamics Graph ---
+            function setupPopulationChart() {
+                resetPopulationHistory(); // Clear old data
+
+                try {
+                    let chartElement = document.getElementById('population-chart');
+                    if (!chartElement) {
+                        debugLog("Error: Population chart canvas element not found.");
+                        return;
+                    }
+                    let ctx = chartElement.getContext('2d');
+                    if (!ctx) {
+                        debugLog("Error: Could not get 2D context for population chart.");
+                        return;
+                    }
+
+                    // Check if Chart is available and is a constructor function
+                    if (typeof window.Chart === 'function') {
+                        debugLog("Setting up Chart.js for population graph.");
+                        populationChart = new window.Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: [],
+                                datasets: [
+                                    {
+                                        label: 'Healthy Cells',
+                                        data: [],
+                                        borderColor: 'rgba(100, 180, 240, 1)',
+                                        backgroundColor: 'rgba(100, 180, 240, 0.2)',
+                                        tension: 0.2, // Slightly less curve
+                                        pointRadius: 0, // Hide points
+                                        borderWidth: 1.5
+                                    },
+                                    {
+                                        label: 'Cancer Cells',
+                                        data: [],
+                                        borderColor: 'rgba(255, 80, 112, 1)',
+                                        backgroundColor: 'rgba(255, 80, 112, 0.2)',
+                                        tension: 0.2,
+                                        pointRadius: 0,
+                                        borderWidth: 1.5
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: { duration: 0 }, // Disable animation for performance
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                        ticks: { color: 'rgba(200, 200, 255, 0.8)', stepSize: 50 } // Adjust step size as needed
+                                    },
+                                    x: {
+                                        grid: { display: false }, // Hide x-axis grid lines
+                                        ticks: {
+                                            color: 'rgba(200, 200, 255, 0.8)',
+                                            maxTicksLimit: 6, // Limit number of time labels
+                                            callback: function(value, index, values) {
+                                                // Show label in seconds 's'
+                                                return window.simulationVars.populationHistory.timestamps[index] + 's';
+                                            }
+                                         }
+                                    }
+                                },
+                                plugins: {
+                                    legend: {
+                                        labels: { color: 'rgba(200, 200, 255, 0.9)', boxWidth: 15, padding: 15 }
+                                    },
+                                    tooltip: { enabled: false } // Disable tooltips on chart points
+                                }
+                            }
+                        });
+                        // Remove fallback message
+                        const fallbackElement = document.getElementById('population-chart-container');
+                        const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
+                        if (fallbackMessage) fallbackMessage.remove();
+                    } else {
+                        debugLog("Chart.js library not available. Using fallback visualization.");
+                        // Define a simple object with update and destroy methods
+                        populationChart = { 
+                            update: function() {}, 
+                            destroy: function() {} 
+                        };
+                        drawFallbackChart(); // Initial draw of fallback
+                    }
+                } catch (err) {
+                    debugLog("Error setting up population chart: " + err.message);
+                    console.error(err);
+                    // Ensure populationChart is at least a dummy object
+                    populationChart = { update: function() {}, destroy: function() {} };
+                    drawFallbackChart();
+                }
+            }
+
+            // --- Fallback Chart (Simple Text) ---
+            function drawFallbackChart() {
+                 let container = document.getElementById('population-chart-container');
+                 if (!container) return;
+
+                 // Clear previous fallback text
+                 let existingFallback = container.querySelector('.chart-fallback-display');
+                 if (existingFallback) existingFallback.remove();
+
+                 let fallbackDisplay = document.createElement('div');
+                 fallbackDisplay.className = 'chart-fallback-display';
+                 fallbackDisplay.style.padding = '20px';
+                 fallbackDisplay.style.textAlign = 'center';
+                 fallbackDisplay.style.color = '#ddd';
+                 fallbackDisplay.style.fontSize = '0.9em';
+
+                 const history = window.simulationVars.populationHistory;
+                 if (history.timestamps.length > 0) {
+                     const lastIndex = history.timestamps.length - 1;
+                     fallbackDisplay.innerHTML = `
+                        Time: ${history.timestamps[lastIndex]}s <br>
+                        Healthy: <span style="color: #87CEFA;">${history.healthyCounts[lastIndex]}</span> |
+                        Cancer: <span style="color: #FF5070;">${history.cancerCounts[lastIndex]}</span>
+                     `;
+                 } else {
+                     fallbackDisplay.textContent = "No population data yet.";
+                 }
+                 container.appendChild(fallbackDisplay);
+            }
+
+
+            function resetPopulationHistory() {
+                window.simulationVars.populationHistory = {
+                    timestamps: [],
+                    healthyCounts: [],
+                    cancerCounts: []
+                };
+                lastChartUpdateTime = 0; // Reset timer for updates
+                debugLog("Population history reset.");
+            }
+            // Make accessible globally via p5 instance
+            p.resetPopulationHistory = resetPopulationHistory;
+
+            function updatePopulationChart(forceUpdate = false) {
+                 const currentTime = p.millis();
+                 const updateInterval = 1000; // Update chart data once per second
+
+                 if (!forceUpdate && currentTime - lastChartUpdateTime < updateInterval) return;
+
+                 lastChartUpdateTime = currentTime;
+
+                 // Count cells
+                 let healthyCount = 0;
+                 let cancerCount = 0;
+                 for (let cell of cells) {
+                     if (cell.isCancer) cancerCount++;
+                     else healthyCount++;
+                 }
+
+                 // Add data to history
+                 const timeElapsed = Math.floor(p.frameCount / 60); // Approximate seconds based on 60fps assumption
+                 const history = window.simulationVars.populationHistory;
+                 history.timestamps.push(timeElapsed);
+                 history.healthyCounts.push(healthyCount);
+                 history.cancerCounts.push(cancerCount);
+
+                 // Trim history to keep it manageable (e.g., last 60 data points)
+                 const maxDataPoints = 60;
+                 while (history.timestamps.length > maxDataPoints) {
+                     history.timestamps.shift();
+                     history.healthyCounts.shift();
+                     history.cancerCounts.shift();
+                 }
+
+                 // Update the chart instance
+                 if (populationChart && typeof populationChart.update === 'function') {
+                     try {
+                         // Check if it's a real Chart.js chart with data structure
+                         if (populationChart.data && populationChart.data.labels) {
+                             populationChart.data.labels = history.timestamps; // Use raw timestamps for labels now
+                             populationChart.data.datasets[0].data = history.healthyCounts;
+                             populationChart.data.datasets[1].data = history.cancerCounts;
+                             populationChart.update(); // Call Chart.js update
+                         } else {
+                             // If it's the fallback/dummy, call the drawing function
+                             drawFallbackChart();
+                         }
+                     } catch (err) {
+                         debugLog("Error updating population chart: " + err.message);
+                         console.error(err);
+                         // Attempt fallback draw on error
+                         drawFallbackChart();
+                     }
+                 } else if (!populationChart) {
+                      // If chart hasn't been initialized yet (rare edge case), try fallback
+                      drawFallbackChart();
+                 }
+            }
+             // Make accessible globally via p5 instance
+             p.updatePopulationChart = updatePopulationChart;
+
+
+            // --- Event Timeline ---
+            function addEvent(title, description) {
+                // Avoid adding duplicate events close together in time
+                 const existingEvent = window.simulationVars.events.find(e => e.title === title);
+                 const timeElapsed = Math.floor(p.frameCount / 60); // Approximate seconds
+
+                 // Only add if it's a new type of event or significantly later than the last one of same type
+                 if (!existingEvent || (timeElapsed - existingEvent.time > 5)) {
+                    window.simulationVars.events.push({
+                        time: timeElapsed,
+                        title: title,
+                        description: description
+                    });
+                    debugLog(`Event added: "${title}" at ${timeElapsed}s`);
+                    updateEventTimeline(); // Update display immediately
+                 }
+            }
+            window.addEvent = addEvent; // Make globally accessible
+
+            function updateEventTimeline() {
+                let timelineDiv = document.getElementById('event-timeline');
+                if (!timelineDiv) return;
+
+                // Clear existing event markers
+                timelineDiv.innerHTML = '';
+
+                const events = window.simulationVars.events;
+                if (events.length === 0) {
+                    timelineDiv.style.display = 'none'; // Hide if no events
+                    return;
+                }
+
+                timelineDiv.style.display = 'block'; // Show if events exist
+
+                // Determine the time range for the timeline
+                const maxTime = events.length > 0 ? Math.max(...events.map(e => e.time), 30) : 30; // Ensure minimum width (e.g., 30s)
+
+                for (let event of events) {
+                    let positionPercent = (event.time / maxTime) * 100;
+                    positionPercent = Math.max(0, Math.min(100, positionPercent)); // Clamp between 0 and 100
+
+                    let marker = document.createElement('div');
+                    marker.className = 'timeline-event';
+                    marker.style.left = positionPercent + '%';
+
+                    // Add tooltip element inside marker
+                    let tooltip = document.createElement('div');
+                    tooltip.className = 'timeline-event-tooltip';
+                    tooltip.textContent = `${event.time}s: ${event.title}`;
+                    marker.appendChild(tooltip);
+
+                    timelineDiv.appendChild(marker);
+                }
+            }
+            window.updateEventTimeline = updateEventTimeline; // Make globally accessible
+
+            // --- Visual Annotations ---
+            function showAnnotation(x, y, text) {
+                const canvasContainer = document.getElementById('canvas-container');
+                if (!canvasContainer) return;
+
+                let annotation = document.createElement('div');
+                annotation.textContent = text;
+                annotation.className = 'annotation'; // Base class
+                // Position relative to the canvas container, using canvas coordinates
+                annotation.style.left = `${x}px`;
+                annotation.style.top = `${y}px`;
+
+                canvasContainer.appendChild(annotation); // Add to container
+
+                // Trigger fade-in using a class
+                // Timeout ensures the element is in the DOM before transition starts
+                setTimeout(() => {
+                    annotation.classList.add('visible');
+                }, 50);
+
+                // Remove after delay
+                setTimeout(() => {
+                    annotation.style.opacity = '0'; // Start fade-out
+                    setTimeout(() => {
+                        if (annotation.parentNode) { // Check if still exists
+                            annotation.remove();
+                        }
+                    }, 500); // Remove after fade-out completes
+                }, 4000); // Duration annotation stays visible
+            }
+             window.showAnnotation = showAnnotation; // Make globally accessible
+
+
+            // --- Draw Gap Junctions ---
+            function drawGapJunctions() {
+                p.stroke(136, 187, 255, 90); // Semi-transparent blue
+                p.strokeWeight(1);
+
+                let drawnConnections = new Set(); // Avoid drawing connections twice
+
+                for (let i = 0; i < cells.length; i++) {
+                    let cellA = cells[i];
+                    // Only draw from healthy cells
+                    if (cellA.isCancer) continue;
+
+                    // Find nearby healthy neighbors
+                    for (let j = i + 1; j < cells.length; j++) {
+                         let cellB = cells[j];
+                         if (cellB.isCancer) continue; // Only connect healthy to healthy
+
+                        // Check distance
+                        let dSq = (cellA.pos.x - cellB.pos.x)**2 + (cellA.pos.y - cellB.pos.y)**2;
+                        let connectRadius = Math.min(cellWidth, cellHeight) * 1.2; // Slightly larger than cell size
+
+                        if (dSq < connectRadius * connectRadius) {
+                            // Ensure connection hasn't been drawn from B to A
+                            let connectionId1 = `${cellA.id}-${cellB.id}`;
+                            let connectionId2 = `${cellB.id}-${cellA.id}`;
+
+                            if (!drawnConnections.has(connectionId1) && !drawnConnections.has(connectionId2)) {
+                                drawDashedLine(cellA.pos.x, cellA.pos.y, cellB.pos.x, cellB.pos.y, 4, 3); // Draw dashed line
+                                drawnConnections.add(connectionId1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Helper for dashed lines
+            function drawDashedLine(x1, y1, x2, y2, dashLength, gapLength) {
+                 const dx = x2 - x1;
+                 const dy = y2 - y1;
+                 const distance = Math.sqrt(dx * dx + dy * dy);
+                 const dashCount = Math.floor(distance / (dashLength + gapLength));
+                 const xStep = dx / distance * (dashLength + gapLength);
+                 const yStep = dy / distance * (dashLength + gapLength);
+                 const dashRatio = dashLength / (dashLength + gapLength);
+
+                 p.push(); // Isolate drawing state
+                 p.noFill();
+                 let currentX = x1;
+                 let currentY = y1;
+                 for (let i = 0; i < dashCount; i++) {
+                     let nextX = currentX + xStep * dashRatio;
+                     let nextY = currentY + yStep * dashRatio;
+                     p.line(currentX, currentY, nextX, nextY);
+                     currentX += xStep;
+                     currentY += yStep;
+                 }
+                 // Draw partial dash at the end if needed
+                 let remainingDist = distance - dashCount * (dashLength + gapLength);
+                 if (remainingDist > 0) {
+                      let finalDashLength = Math.min(remainingDist, dashLength);
+                      let finalXStep = dx / distance * finalDashLength;
+                      let finalYStep = dy / distance * finalDashLength;
+                      p.line(currentX, currentY, currentX + finalXStep, currentY + finalYStep);
+                 }
+                 p.pop(); // Restore drawing state
+            }
+
+            // --- Detail View ---
+            function drawDetailView(cell) {
+                if (!detailCtx || !cell) return; // Need context and a cell
+
+                const w = detailCtx.canvas.width;
+                const h = detailCtx.canvas.height;
+
+                // Clear canvas
+                detailCtx.clearRect(0, 0, w, h);
+
+                // Background
+                detailCtx.fillStyle = 'rgba(20, 20, 40, 0.7)';
+                detailCtx.fillRect(0, 0, w, h);
+
+                // Title
+                detailCtx.fillStyle = '#ffffff';
+                detailCtx.font = 'bold 14px Segoe UI, sans-serif';
+                detailCtx.textAlign = 'center';
+                detailCtx.fillText(cell.isCancer ? 'Cancer Cell Detail' : 'Healthy Cell Detail', w / 2, 20);
+
+                // Cell Representation
+                const centerX = w / 2;
+                const centerY = h / 2 - 10; // Move slightly up
+                const cellRadius = Math.min(w, h) * 0.25; // Relative radius
+
+                // Membrane potential visualization (simplified)
+                 let potentialPercent = p.map(cell.membranePotential, HEALTHY_MEMBRANE_POTENTIAL, CANCER_MEMBRANE_POTENTIAL, 0, 1, true); // Map potential to 0-1 range
+                 let membraneColor = p.lerpColor(p.color(100, 180, 240), p.color(255, 80, 112), potentialPercent).toString(); // Interpolate color
+
+
+                // Draw outer glow based on potential
+                detailCtx.shadowBlur = 15;
+                detailCtx.shadowColor = membraneColor;
+
+                // Draw cell membrane
+                detailCtx.strokeStyle = membraneColor;
+                detailCtx.lineWidth = 4;
+                detailCtx.beginPath();
+                detailCtx.arc(centerX, centerY, cellRadius, 0, 2 * Math.PI);
+                detailCtx.stroke();
+
+                 // Reset shadow for interior
+                 detailCtx.shadowBlur = 0;
+
+                // Fill cell interior based on current color (more accurate)
+                let interiorColor = cell.currentColor.toString(); // Get RGBA string from p5 color
+                detailCtx.fillStyle = interiorColor;
+                detailCtx.fill();
+
+
+                // Draw nucleus
+                let nucleusFill = cell.isCancer ? nucleusCancerColor.toString() : nucleusHealthyColor.toString();
+                detailCtx.fillStyle = nucleusFill;
+                detailCtx.beginPath();
+                detailCtx.arc(centerX, centerY, cellRadius * 0.4, 0, 2 * Math.PI);
+                detailCtx.fill();
+
+                // Information Text below cell
+                detailCtx.fillStyle = '#e0e0ff';
+                detailCtx.font = '12px Segoe UI, sans-serif';
+                detailCtx.textAlign = 'center';
+                let yPos = centerY + cellRadius + 25; // Starting Y for text
+
+                // Membrane Potential Text
+                 detailCtx.fillText(`Potential: ${cell.membranePotential.toFixed(0)} mV (${cell.isCancer ? 'Depolarized' : 'Polarized'})`, w / 2, yPos);
+                 yPos += 18;
+
+                 // State-specific info
+                if (cell.isCancer) {
+                    // Proliferation Energy Bar
+                    let energyPercent = p.constrain(cell.proliferationEnergy / PROLIFERATION_ENERGY_MAX, 0, 1);
+                    const barWidth = w * 0.6;
+                    const barHeight = 8;
+                    const barX = centerX - barWidth / 2;
+                    const barY = yPos;
+                    detailCtx.fillStyle = 'rgba(60, 60, 90, 0.8)';
+                    detailCtx.fillRect(barX, barY, barWidth, barHeight);
+                    detailCtx.fillStyle = 'rgba(255, 100, 130, 1)';
+                    detailCtx.fillRect(barX, barY, barWidth * energyPercent, barHeight);
+                    detailCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+                    detailCtx.lineWidth = 0.5;
+                    detailCtx.strokeRect(barX, barY, barWidth, barHeight);
+                    yPos += barHeight + 5;
+                     detailCtx.fillText(`Proliferation Energy: ${Math.round(energyPercent * 100)}%`, w / 2, yPos);
+                     yPos += 18;
+                    detailCtx.fillText(`Receiving Signals: ${cell.signalsReceivedThisPeriod}`, w / 2, yPos);
+
+                } else {
+                    // Healthy cell info
+                     detailCtx.fillText(`Maintaining Tissue Pattern`, w / 2, yPos);
+                     yPos += 18;
+                     detailCtx.fillText(`Receiving Signals: ${cell.signalsReceivedThisPeriod}`, w / 2, yPos);
+                }
+            }
+
+
+            // --- Display Tooltip ---
+            function displayTooltip() {
+                if (hoveredCell && tooltipDiv) {
+                    tooltipDiv.style('display', 'block');
+
+                    // Calculate position relative to canvas, avoid screen edges
+                    const canvasRect = window.simulationVars.canvasElement.getBoundingClientRect();
+                    let ttX = canvasRect.left + p.mouseX + 15;
+                    let ttY = canvasRect.top + p.mouseY + 15;
+                    let ttWidth = tooltipDiv.elt.offsetWidth;
+                    let ttHeight = tooltipDiv.elt.offsetHeight;
+
+                    // Adjust if too close to right edge
+                    if (ttX + ttWidth > window.innerWidth - 10) {
+                        ttX = canvasRect.left + p.mouseX - ttWidth - 15;
+                    }
+                    // Adjust if too close to bottom edge
+                    if (ttY + ttHeight > window.innerHeight - 10) {
+                        ttY = canvasRect.top + p.mouseY - ttHeight - 15;
+                    }
+                    // Adjust if too close to left edge (less common)
+                     if (ttX < 10) {
+                        ttX = 10;
+                     }
+                     // Adjust if too close to top edge (less common)
+                     if (ttY < 10) {
+                         ttY = 10;
+                     }
+
+
+                    tooltipDiv.position(ttX + window.scrollX, ttY + window.scrollY); // Account for page scroll
+
+                    let state = hoveredCell.isCancer ? 'Cancer' : 'Healthy';
+                    let network = hoveredCell.isCancer ? 'Disrupted Network' : 'Coordinated Network';
+                    let membranePotential = hoveredCell.membranePotential.toFixed(0);
+                    let potentialState = hoveredCell.isCancer ? 'Depolarized' : 'Polarized';
+
+                    let energyInfo = "";
+                    if (hoveredCell.isCancer) {
+                         let energyPercent = Math.min(100, Math.round(hoveredCell.proliferationEnergy / PROLIFERATION_ENERGY_MAX * 100));
+                        energyInfo = `<br>Proliferation Energy: ${energyPercent}%`;
+                    } else {
+                         energyInfo = '<br>Growth Inhibited';
+                    }
+
+                    let signalInfo = `<br>Signals Rx: ${hoveredCell.signalsReceivedThisPeriod}`;
+
+                    tooltipDiv.html(`<b>${state} Cell</b> (${network})<br>Potential: ${membranePotential}mV (${potentialState})${energyInfo}${signalInfo}<br><small>ID: ${hoveredCell.id}</small>`);
+                } else if (tooltipDiv) {
+                    tooltipDiv.style('display', 'none');
+                }
+            }
+
+            // --- Cell Class ---
+            class Cell {
+                constructor(x, y, startColor, id) {
+                    this.id = id;
+                    this.pos = p.createVector(x, y);
+                    this.vel = p.createVector(p.random(-0.1, 0.1), p.random(-0.1, 0.1)); // Slight initial drift
+                    this.acc = p.createVector();
+                    this.targetColor = startColor;
+                    this.currentColor = p.color(p.red(startColor), p.green(startColor), p.blue(startColor), p.alpha(startColor));
+                    this.nucleusColor = nucleusHealthyColor;
+                    this.isCancer = false;
+                    this.initialSize = Math.min(cellWidth, cellHeight) * p.random(0.75, 0.85);
+                    this.size = this.initialSize;
+                    this.targetSize = this.initialSize;
+                    this.nucleusSize = this.size * 0.3;
+                    this.proliferationEnergy = 0; // Only used by cancer cells
+                    this.newlySpawned = null; // Reference to a cell spawned in the current frame
+                    this.messageCooldown = 0; // Timer to limit message emission rate
+                    this.signalsReceivedThisPeriod = 0; // Count signals received in one update cycle
+                    this.receptionGlowTimer = 0; // Visual effect on receiving message
+                    this.emissionPulseTimer = 0; // Visual effect on sending message
+                    this.stateChangeFlashTimer = 0; // Visual effect on state change
+                    this.proliferationBurstTimer = 0; // Visual effect on division
+
+                    this.membranePotential = HEALTHY_MEMBRANE_POTENTIAL; // Start healthy
+
+                    // Cell morphology (for irregular cancer shapes)
+                    this.irregularityVectors = [];
+                    this.resetIrregularityVectors(); // Initialize with smooth shape
+                    this.morphologyUpdateCounter = p.random(10); // Stagger morphology updates
+                }
+
+                 // --- Cell Shape ---
+                resetIrregularityVectors() {
+                    this.irregularityVectors = [];
+                    const points = 12; // Number of points defining the shape outline
+                    for (let i = 0; i < points; i++) {
+                        let angle = p.map(i, 0, points, 0, p.TWO_PI);
+                        // magnitude represents radius multiplier at this angle
+                        this.irregularityVectors.push({ angle: angle, magnitude: 1.0 });
+                    }
+                }
+
+                generateIrregularityVectors(makeIrregular = true) {
+                    this.irregularityVectors = [];
+                    const points = 12;
+                    for (let i = 0; i < points; i++) {
+                        let angle = p.map(i, 0, points, 0, p.TWO_PI);
+                        let magnitude = makeIrregular ? p.random(0.8, 1.2) : 1.0;
+                        this.irregularityVectors.push({ angle: angle, magnitude: magnitude });
+                    }
+                }
+
+                updateIrregularityVectors(speedFactor) {
+                     // Only update cancer cells, and only periodically
+                    if (!this.isCancer || this.morphologyUpdateCounter > 0) {
+                         this.morphologyUpdateCounter -= speedFactor;
+                         return;
+                    }
+                    this.morphologyUpdateCounter = 5 + p.random(5); // Reset counter
+
+                    for (let vector of this.irregularityVectors) {
+                        // Gradually change magnitude, tending towards more irregular
+                         vector.magnitude += p.random(-0.05, 0.08) * speedFactor;
+                         vector.magnitude = p.constrain(vector.magnitude, 0.7, 1.4); // Limit irregularity
+
+                         // Optionally slowly rotate the points? (more complex)
+                         // vector.angle += p.random(-0.01, 0.01) * speedFactor;
+                    }
+                }
+
+
+                // --- Cell Physics & State Update ---
+                applyForce(force) {
+                    this.acc.add(force);
+                }
+
+                update(allCells, speedFactor) {
+                    // --- Update Timers ---
+                    if (this.messageCooldown > 0) this.messageCooldown -= speedFactor;
+                    if (this.receptionGlowTimer > 0) this.receptionGlowTimer -= speedFactor;
+                    if (this.emissionPulseTimer > 0) this.emissionPulseTimer -= speedFactor;
+                    if (this.stateChangeFlashTimer > 0) this.stateChangeFlashTimer -= speedFactor;
+                    if (this.proliferationBurstTimer > 0) this.proliferationBurstTimer -= speedFactor;
+
+                    // --- Apply Physics ---
+                    this.vel.add(this.acc);
+                    this.vel.limit(1.5 * speedFactor); // Limit max speed
+                    this.pos.add(this.vel);
+                    this.vel.mult(0.95); // Apply damping/friction
+                    this.acc.mult(0); // Reset acceleration
+
+                    // --- Keep within Bounds ---
+                    let padding = this.size / 2;
+                    if (this.pos.x < padding) { this.pos.x = padding; this.vel.x *= -0.5; }
+                    if (this.pos.x > p.width - padding) { this.pos.x = p.width - padding; this.vel.x *= -0.5; }
+                    if (this.pos.y < padding) { this.pos.y = padding; this.vel.y *= -0.5; }
+                    if (this.pos.y > p.height - padding) { this.pos.y = p.height - padding; this.vel.y *= -0.5; }
+
+                     // --- Update Morphology ---
+                    this.updateIrregularityVectors(speedFactor);
+
+                     // --- Update Visual Properties (Color, Size) ---
+                    this.currentColor = p.lerpColor(this.currentColor, this.targetColor, 0.05 * speedFactor);
+                    this.size = p.lerp(this.size, this.targetSize, 0.02 * speedFactor);
+                    this.nucleusSize = this.size * (this.isCancer ? p.random(0.38, 0.48) : 0.3);
+
+
+                    // --- State-Specific Logic ---
+                    if (this.isCancer) {
+                        // --- Cancer Cell Update ---
+                        this.nucleusColor = nucleusCancerColor;
+                        this.targetSize = this.initialSize * 1.1; // Cancer cells tend to be slightly larger
+
+                         // Gradually depolarize membrane potential
+                         this.membranePotential = p.lerp(this.membranePotential, CANCER_MEMBRANE_POTENTIAL, 0.05 * speedFactor);
+
+                        // Accumulate proliferation energy if feature enabled
+                        if (features.proliferation) {
+                            this.proliferationEnergy += 0.8 * speedFactor; // Base energy gain over time
+
+                             // Check for division
+                            if (this.proliferationEnergy >= PROLIFERATION_ENERGY_MAX && allCells.length < maxCells) {
+                                this.proliferate(allCells); // Attempt to divide
+                                // Energy reset happens within proliferate() on success
+                            }
+                        }
+
+                    } else {
+                        // --- Healthy Cell Update ---
+                        this.nucleusColor = nucleusHealthyColor;
+                        this.targetSize = this.initialSize; // Maintain normal size
+
+                         // Gradually polarize/maintain healthy potential
+                         this.membranePotential = p.lerp(this.membranePotential, HEALTHY_MEMBRANE_POTENTIAL, 0.05 * speedFactor);
+
+                        // Healthy cells don't proliferate based on energy
+                        this.proliferationEnergy = 0;
+                    }
+                } // --- End of update ---
+
+
+                // --- Cell Actions ---
+                emitMessage(allCells, type) {
+                    if (this.messageCooldown > 0) return; // Don't emit if on cooldown
+
+                    // Find potential targets (neighbors)
+                    let potentialTargets = [];
+                    const radiusSq = communicationRadius * communicationRadius;
+
+                    for (let other of allCells) {
+                        if (other.id === this.id) continue; // Don't message self
+
+                         // Healthy cells only message other healthy cells via gap junctions (short range)
+                         if (type === 'COORDINATE' && !this.isCancer && !other.isCancer) {
+                              let dSq = (this.pos.x - other.pos.x)**2 + (this.pos.y - other.pos.y)**2;
+                              let connectRadius = Math.min(cellWidth, cellHeight) * 1.2; // Gap junction range
+                              if (dSq < connectRadius * connectRadius) {
+                                   potentialTargets.push(other);
+                              }
+                         }
+                         // Cancer cells message other nearby cancer cells
+                         else if (type === 'PROLIFERATE' && this.isCancer && other.isCancer) {
+                              let dSq = (this.pos.x - other.pos.x)**2 + (this.pos.y - other.pos.y)**2;
+                              if (dSq < radiusSq * 0.8) { // Slightly shorter range for cancer signals
+                                   potentialTargets.push(other);
+                              }
+                         }
+                    }
+
+
+                    if (potentialTargets.length > 0) {
+                        // Select one random target from neighbors
+                        let targetCell = p.random(potentialTargets);
+                         // Create and add message
+                        messages.push(new Message(this.pos, targetCell, type, this.id));
+                        this.messageCooldown = p.random(20, 40) / simulationSpeed; // Set cooldown (affected by speed)
+                        this.emissionPulseTimer = 10; // Visual feedback
+                    }
+                }
+
+                receiveMessage(type, originatorId) {
+                    this.receptionGlowTimer = 12; // Visual feedback
+                    this.signalsReceivedThisPeriod++;
+
+                    if (this.isCancer) {
+                        // Cancer cells respond to PROLIFERATE signals from other cancer cells
+                        if (type === 'PROLIFERATE' && features.proliferation) {
+                             this.proliferationEnergy += PROLIFERATION_BOOST * (p.random(0.8, 1.2)); // Gain energy boost
+                             this.proliferationEnergy = Math.min(this.proliferationEnergy, PROLIFERATION_ENERGY_MAX * 1.1); // Cap slightly above max
+                        }
+                        // Cancer cells ignore COORDINATE signals
+                    } else {
+                        // Healthy cells respond to COORDINATE signals (e.g., maintain state, repair)
+                        if (type === 'COORDINATE') {
+                            // Reinforce healthy state (e.g., slightly stronger polarization)
+                            this.membranePotential = p.lerp(this.membranePotential, HEALTHY_MEMBRANE_POTENTIAL, 0.1);
+                             // Maybe add a small "repair" effect if needed later
+                        }
+                        // Healthy cells ignore PROLIFERATE signals
+                    }
+                }
+
+                proliferate(allCells) {
+                    if (!this.isCancer || !features.proliferation) return; // Only cancer cells proliferate, if feature is on
+
+                    // Calculate spawn position slightly offset from parent
+                    let spawnOffset = p5.Vector.random2D().mult(this.size * 0.3);
+                    let spawnPos = p5.Vector.add(this.pos, spawnOffset);
+
+                    // Create new cancer cell
+                    let newId = `C-${p.frameCount}-${Math.floor(p.random(1000))}`; // Unique-ish ID
+                    let newCell = new Cell(spawnPos.x, spawnPos.y, this.targetColor, newId);
+                    newCell.isCancer = true;
+                    newCell.currentColor = p.color(p.red(this.currentColor), p.green(this.currentColor), p.blue(this.currentColor), p.alpha(this.currentColor));
+                    newCell.targetColor = p.color(p.red(this.targetColor), p.green(this.targetColor), p.blue(this.targetColor), p.alpha(this.targetColor));
+                    newCell.nucleusColor = this.nucleusColor;
+                    newCell.size = this.size * 0.8; // Start slightly smaller
+                    newCell.targetSize = this.targetSize;
+                    newCell.membranePotential = this.membranePotential; // Inherit potential
+                    newCell.generateIrregularityVectors(true); // Make sure it's irregular
+
+                    // Parent loses some energy and shrinks slightly
+                    this.proliferationEnergy = 0; // Reset energy after division
+                    this.size *= 0.9; // Parent shrinks a bit
+                    this.targetSize = this.initialSize * 1.1; // Target original cancer size again
+                    this.proliferationBurstTimer = 15; // Visual effect
+
+                    this.newlySpawned = newCell; // Store reference for main loop to add
+
+                     debugLog(`Cell ${this.id} proliferated into ${newCell.id}`);
+                }
+
+
+                // --- Cell Drawing ---
+                display() {
+                    p.push(); // Isolate drawing state for this cell
+                    p.translate(this.pos.x, this.pos.y);
+
+                    // --- Apply Visual Effects ---
+                    let currentSize = this.size;
+                    // State change flash (white flash)
+                    if (this.stateChangeFlashTimer > 0) {
+                         let flashAmount = p.map(this.stateChangeFlashTimer, 15, 0, 1, 0);
+                         p.fill(255, 255, 255, flashAmount * 150);
+                         p.noStroke();
+                         this.drawShape(currentSize * 1.2); // Draw slightly larger flash
+                    }
+                     // Proliferation burst (expanding ring)
+                    if (this.proliferationBurstTimer > 0) {
+                        let burstProgress = p.map(this.proliferationBurstTimer, 15, 0, 0, 1);
+                        p.noFill();
+                        p.stroke(255, 150, 150, (1 - burstProgress) * 200); // Fading red
+                        p.strokeWeight(2 * (1 - burstProgress));
+                        this.drawShape(currentSize * (1 + burstProgress * 0.5)); // Expanding shape
+                    }
+                     // Emission pulse (slight size increase and glow)
+                     if (this.emissionPulseTimer > 0) {
+                         let pulseAmount = p.sin(p.map(this.emissionPulseTimer, 10, 0, 0, p.PI)); // Sine wave pulse
+                         currentSize = this.size * (1 + pulseAmount * 0.05); // Subtle size pulse
+                         // Could add a glow effect here too
+                     }
+                     // Reception glow (inner glow)
+                     if (this.receptionGlowTimer > 0) {
+                         let glowAmount = p.map(this.receptionGlowTimer, 12, 0, 1, 0);
+                         let glowColor = this.isCancer ? p.color(255, 180, 180, glowAmount * 100) : p.color(180, 220, 255, glowAmount * 100);
+                         p.fill(glowColor);
+                         p.noStroke();
+                         this.drawShape(currentSize * 0.8); // Inner glow
+                     }
+
+
+                    // --- Draw Cell Body ---
+                    p.strokeWeight(1.5);
+                    p.stroke(p.red(this.currentColor), p.green(this.currentColor), p.blue(this.currentColor), 255); // Use current color for stroke, but fully opaque
+                    p.fill(p.red(this.currentColor), p.green(this.currentColor), p.blue(this.currentColor), p.alpha(this.currentColor)); // Use current color for fill
+                    this.drawShape(currentSize); // Draw the main shape
+
+
+                    // --- Draw Nucleus ---
+                    p.noStroke();
+                    p.fill(this.nucleusColor);
+                    p.ellipse(0, 0, this.nucleusSize, this.nucleusSize);
+
+
+                    // --- Draw Hover/Selection Highlight ---
+                    if (this === hoveredCell) {
+                        p.noFill();
+                        p.stroke(255, 255, 0, 180); // Yellow highlight for hover
+                        p.strokeWeight(2);
+                        this.drawShape(currentSize * 1.1);
+                    } else if (this === selectedCell) {
+                         p.noFill();
+                         p.stroke(0, 255, 0, 200); // Green highlight for selection
+                         p.strokeWeight(2.5);
+                         this.drawShape(currentSize * 1.15);
+                    }
+
+                    p.pop(); // Restore previous drawing state
+                }
+
+                 // Helper to draw the potentially irregular shape
+                 drawShape(diameter) {
+                      if (this.isCancer && this.irregularityVectors.length > 0) {
+                           p.beginShape();
+                           for (let vec of this.irregularityVectors) {
+                                let radius = (diameter / 2) * vec.magnitude;
+                                p.vertex(p.cos(vec.angle) * radius, p.sin(vec.angle) * radius);
+                           }
+                           p.endShape(p.CLOSE);
+                      } else {
+                           // Draw simple ellipse for healthy cells or if vectors are missing
+                           p.ellipse(0, 0, diameter, diameter);
+                      }
+                 }
+
+
+            } // --- End of Cell Class ---
+
+
+            // --- Message Class ---
+            class Message {
+                constructor(originPos, targetCell, type, originatorId) {
+                    this.originPos = originPos.copy();
+                    this.pos = originPos.copy();
+                    this.target = targetCell; // Reference to the target cell object
+                    this.type = type; // 'COORDINATE' or 'PROLIFERATE'
+                    this.originatorId = originatorId;
+                    this.vel = p5.Vector.sub(targetCell.pos, this.pos).normalize().mult(p.random(1.5, 2.5));
+                    this.lifetime = MESSAGE_LIFETIME;
+                    this.size = 5;
+
+                    // Set color and shape based on type
+                    if (type === 'COORDINATE') {
+                        this.color = p.color(255, 255, 150, 200); // Yellowish
+                        this.shape = 'triangle';
+                    } else { // PROLIFERATE
+                        this.color = p.color(255, 100, 100, 200); // Reddish
+                        this.shape = 'square';
+                    }
+                }
+
+                update(speedFactor) {
+                    // Move towards target's current position (makes them track moving cells)
+                    if (this.target) {
+                         let direction = p5.Vector.sub(this.target.pos, this.pos);
+                         // Prevent division by zero if directly on target
+                         if (direction.magSq() > 1) {
+                             direction.normalize();
+                             // Accelerate towards target, but keep some momentum
+                             this.vel.add(direction.mult(0.2 * speedFactor));
+                             this.vel.limit(3 * speedFactor);
+                         }
+                    }
+
+                    this.pos.add(this.vel.copy().mult(speedFactor));
+                    this.lifetime -= speedFactor;
+                }
+
+                isDone() {
+                    // Check lifetime or if very close to target
+                    let closeToTarget = false;
+                    if (this.target) {
+                        // Replace p5.Vector.distSq with manual calculation of squared distance
+                        let dx = this.pos.x - this.target.pos.x;
+                        let dy = this.pos.y - this.target.pos.y;
+                        let distSq = dx*dx + dy*dy;
+                        
+                        if (distSq < (this.target.size * 0.4)**2) { // Consider done if inside target radius
+                            closeToTarget = true;
+                        }
+                    }
+                    return this.lifetime <= 0 || closeToTarget;
+                }
+
+                display() {
+                    p.push();
+                    p.translate(this.pos.x, this.pos.y);
+                    p.fill(this.color);
+                    p.noStroke();
+
+                    if (this.shape === 'triangle') {
+                        p.beginShape();
+                        p.vertex(0, -this.size * 0.8); // Point down
+                        p.vertex(-this.size * 0.6, this.size * 0.4);
+                        p.vertex(this.size * 0.6, this.size * 0.4);
+                        p.endShape(p.CLOSE);
+                    } else { // Square
+                        p.rectMode(p.CENTER);
+                        p.rect(0, 0, this.size, this.size);
+                    }
+                    p.pop();
+                }
+            } // --- End of Message Class ---
+
+        }; // --- End of p5 sketch function ---
+
+        // --- Start p5.js ---
+        window.addEventListener('load', () => {
+            if (typeof p5 !== 'undefined') {
+                new p5(sketch);
+                 debugLog("p5 instance created.");
+            } else {
+                console.error("p5 instance could not be created because p5 is undefined.");
+                 // Display error message to user if p5 failed to load initially
+                 const canvasContainer = document.getElementById('canvas-container');
+                 if (canvasContainer) {
+                     canvasContainer.innerHTML = '<p style="color: red; padding: 20px; text-align: center;">Error: Simulation cannot run because p5.js failed to load. Please check your internet connection and refresh the page.</p>';
+                 }
+            }
+        });
+
+    </script>
+
+</body>
+</html>
