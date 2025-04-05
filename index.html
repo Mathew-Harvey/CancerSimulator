@@ -18,75 +18,187 @@
         });
     </script>
 
-    <!-- Add Chart.js with fallback -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Add Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script>
-        // Create global placeholder for Chart
-        window.Chart = null;
-
-        // Function to load Chart.js
-        function loadChartJS() {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chart.js/3.7.0/chart.min.js';
-                script.onload = () => {
-                    console.log("Chart.js loaded successfully!");
-                    resolve();
-                };
-                script.onerror = (event) => {
-                    console.error("Chart.js failed to load:", event);
-                    console.log("Using fallback visualization for charts.");
-                    // Define a dummy Chart object if loading fails
-                    window.Chart = function(context, config) {
-                        console.log("Dummy Chart created. Configuration:", config);
-                        const fallbackElement = document.getElementById('population-chart-container');
-                        if (fallbackElement && !fallbackElement.querySelector('.chart-fallback-message')) {
-                            const fallbackMessage = document.createElement('div');
-                            fallbackMessage.textContent = "Chart library failed to load. Displaying basic data.";
-                            fallbackMessage.style.color = '#ffcccc';
-                            fallbackMessage.style.textAlign = 'center';
-                            fallbackMessage.style.marginTop = '20px';
-                            fallbackMessage.className = 'chart-fallback-message';
-                            fallbackElement.appendChild(fallbackMessage);
-                        }
-                        return {
-                            update: function() {
-                                // Basic fallback update - could display text numbers
-                                // console.log("Dummy chart update called");
-                                // This will be handled by the fallback drawing function if needed
-                            },
-                            destroy: function() {
-                                const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
-                                if (fallbackMessage) fallbackMessage.remove();
-                                console.log("Dummy chart destroy called");
-                            }
-                        };
-                    };
-                    resolve(); // Resolve anyway since we have a fallback mechanism
-                };
-                document.head.appendChild(script);
-            });
-        }
-
-        // Load Chart.js when the page loads
+        // Simple fallback for Chart.js
         window.addEventListener('load', function() {
-            loadChartJS().then(() => {
-                // Add a notice to the data panel if using fallback
-                if (typeof Chart !== 'function' || Chart.name !== 'Chart') { // Check if it's the real Chart or our dummy
-                     const dataPanel = document.getElementById('data-panel');
-                     if (dataPanel && !dataPanel.querySelector('.chart-load-notice')) {
-                        const notice = document.createElement('div');
-                        notice.style.color = '#ff9999';
-                        notice.style.padding = '10px';
-                        notice.style.marginTop = '10px';
-                        notice.style.background = 'rgba(50,20,20,0.3)';
-                        notice.style.borderRadius = '5px';
-                        notice.textContent = 'Chart.js could not be loaded. Simple visualization mode active.';
-                        notice.className = 'chart-load-notice';
-                        dataPanel.prepend(notice);
-                     }
-                 }
-            });
+            if (typeof Chart === 'undefined') {
+                console.error("Chart.js didn't load, using fallback visualization");
+                
+                // Define a fallback Chart constructor
+                window.Chart = function(context, config) {
+                    console.log("Using fallback chart");
+                    
+                    // Show message in the chart container
+                    const container = document.getElementById('population-chart-container');
+                    if (container && !container.querySelector('.chart-fallback-message')) {
+                        const message = document.createElement('div');
+                        message.className = 'chart-fallback-message';
+                        message.textContent = 'Using simplified chart visualization.';
+                        message.style.color = '#aaccff';
+                        message.style.textAlign = 'center';
+                        message.style.margin = '20px 0';
+                        container.appendChild(message);
+                    }
+                    
+                    // Return dummy chart object with required methods
+                    return {
+                        update: function() {
+                            if (window.p5Instance && typeof window.p5Instance.drawFallbackChart === 'function') {
+                                window.p5Instance.drawFallbackChart();
+                            }
+                        },
+                        destroy: function() {
+                            const message = container?.querySelector('.chart-fallback-message');
+                            if (message) message.remove();
+                        },
+                        data: {
+                            labels: [],
+                            datasets: [{data: []}, {data: []}]
+                        }
+                    };
+                };
+                
+                // Show notice in the data panel
+                const dataPanel = document.getElementById('data-panel');
+                if (dataPanel && !dataPanel.querySelector('.chart-load-notice')) {
+                    const notice = document.createElement('div');
+                    notice.className = 'chart-load-notice';
+                    notice.textContent = 'Chart.js could not be loaded. Simple visualization mode active.';
+                    notice.style.color = '#ff9999';
+                    notice.style.padding = '10px';
+                    notice.style.marginTop = '10px';
+                    notice.style.background = 'rgba(50,20,20,0.3)';
+                    notice.style.borderRadius = '5px';
+                    dataPanel.prepend(notice);
+                }
+            } else {
+                console.log("Chart.js loaded successfully!");
+                
+                // Remove any error notices if Chart loaded correctly
+                const dataPanel = document.getElementById('data-panel');
+                const notice = dataPanel?.querySelector('.chart-load-notice');
+                if (notice) notice.remove();
+            }
+        });
+    </script>
+
+    <script>
+        // Embed Chart.js directly to avoid loading issues
+        window.Chart = window.Chart || null;
+
+        // Chart.js embedded version (minified)
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // Only load if not already available
+                if (typeof Chart === 'undefined') {
+                    // Create script tag and add Chart.js content
+                    const script = document.createElement('script');
+                    script.type = 'text/javascript';
+                    console.error("Chart.js not loaded from CDN, using fallback");
+                    // Define fallback Chart object
+                    createFallbackChart();
+                } else {
+                    console.log("Chart.js loaded successfully from CDN!");
+                    
+                    // Remove fallback message if exists
+                    const fallbackElement = document.getElementById('population-chart-container');
+                    const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
+                    if (fallbackMessage) fallbackMessage.remove();
+                    
+                    // Remove the error notice
+                    const dataPanel = document.getElementById('data-panel');
+                    const notice = dataPanel?.querySelector('.chart-load-notice');
+                    if (notice) notice.remove();
+                }
+            } catch (err) {
+                console.error("Error checking Chart.js:", err);
+                createFallbackChart();
+            }
+        });
+        
+        function createFallbackChart() {
+            window.Chart = function(context, config) {
+                console.log("Using fallback chart implementation");
+                const fallbackElement = document.getElementById('population-chart-container');
+                if (fallbackElement && !fallbackElement.querySelector('.chart-fallback-message')) {
+                    const fallbackMessage = document.createElement('div');
+                    fallbackMessage.textContent = "Using simplified chart visualization.";
+                    fallbackMessage.style.color = '#aaccff';
+                    fallbackMessage.style.textAlign = 'center';
+                    fallbackMessage.style.marginTop = '20px';
+                    fallbackMessage.className = 'chart-fallback-message';
+                    fallbackElement.appendChild(fallbackMessage);
+                }
+                return {
+                    update: function() {
+                        // Use fallback visualization
+                        if (window.p5Instance && window.p5Instance.drawFallbackChart) {
+                            window.p5Instance.drawFallbackChart();
+                        }
+                    },
+                    destroy: function() {
+                        const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
+                        if (fallbackMessage) fallbackMessage.remove();
+                    },
+                    data: { 
+                        labels: [],
+                        datasets: [
+                            { data: [] },
+                            { data: [] }
+                        ]
+                    }
+                };
+            };
+        }
+    </script>
+
+    <script>
+        // Embed Chart.js directly to avoid loading issues
+        window.Chart = window.Chart || null;
+
+        // Chart.js embedded version (minified)
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // Only load if not already available
+                if (typeof Chart === 'undefined') {
+                    // Create script tag and add Chart.js content
+                    const script = document.createElement('script');
+                    script.type = 'text/javascript';
+                    script.innerHTML = '!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).Chart=e()}(this,(function(){"use strict";const t="undefined"==typeof window?function(t){return t()}:window.requestAnimationFrame;function e(e,i,s){const n=s||(t=>Array.prototype.slice.call(t));let o=!1,a=[];return function(...s){a=n(s),o||(o=!0,t.call(window,(()=>{o=!1,e.apply(i,a)})))}}function i(t,e){let i;return function(...s){return e?(clearTimeout(i),i=setTimeout(t,e,s)):t.apply(this,s),e}}const s=t=>"start"===t?"left":"end"===t?"right":"center",n=(t,e,i)=>"start"===t?e:"end"===t?i:(e+i)/2,o=(t,e,i,s)=>t===(s?"left":"right")?i:"center"===t?(e+i)/2:e;var a={clear:t=>{t.ctx.clearRect(0,0,t.width,t.height)},roundedRect:(t,e,i,s,n,o)=>{const{x:a,y:r,w:l,h:h,radius:c}=function(t,e,i,s,n){let o=n.topLeft||n.top||0,a=n.topRight||n.top||0,r=n.bottomLeft||n.bottom||0,l=n.bottomRight||n.bottom||0;return{x:t,y:e,w:i,h:s,radius:{topLeft:o,topRight:a,bottomLeft:r,bottomRight:l}}}(e,i,s,n,o);t.beginPath(),t.arc(a+c.topLeft,r+c.topLeft,c.topLeft,-Math.PI,-.5*Math.PI),t.lineTo(a+l-c.topRight,r),t.arc(a+l-c.topRight,r+c.topRight,c.topRight,-.5*Math.PI,0),t.lineTo(a+l,r+h-c.bottomRight),t.arc(a+l-c.bottomRight,r+h-c.bottomRight,c.bottomRight,0,.5*Math.PI),t.lineTo(a+c.bottomLeft,r+h),t.arc(a+c.bottomLeft,r+h-c.bottomLeft,c.bottomLeft,.5*Math.PI,Math.PI),t.closePath()},drawPoint:(t,e,i,s,n,o)=>{const a=0===o?Math.PI/180:o;let r,l,h,c,d,u=e.x,f=e.y;if("object"==typeof s&&(r=s.toString(),"[object HTMLImageElement]"===r||"[object HTMLCanvasElement]"===r))return void t.drawImage(s,u-s.width/2,f-s.height/2,s.width,s.height);if(!(isNaN(i)||i<=0)){switch(t.beginPath(),e){default:t.arc(u,f,i,0,2*Math.PI),t.closePath();break;case"triangle":h=(l=3*i/Math.sqrt(3))/2*Math.sqrt(3),t.moveTo(u,f-l/Math.sqrt(3)),t.lineTo(u-h,f+l/2),t.lineTo(u+h,f+l/2),t.closePath();break;case"rectRounded":c=i-.5,d=Math.pow(i/h,2)+1,t.arc(u+c,f-c,h,0,1.5*Math.PI),t.arc(u+c,f+c,h,1.5*Math.PI,2*Math.PI),t.arc(u-c,f+c,h,0,.5*Math.PI),t.arc(u-c,f-c,h,.5*Math.PI,Math.PI),t.closePath();break;case"rect":if(!o){c=Math.SQRT1_2*i,t.rect(u-c,f-c,2*c,2*c);break}{h=i*Math.SQRT2,t.moveTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),t.closePath();break}case"rectRot":h=i*Math.SQRT2,t.moveTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),a+=Math.PI/4,t.lineTo(u+h*Math.cos(a),f+h*Math.sin(a)),t.closePath();break;case"crossRot":a+=Math.PI/4;case"cross":h=i*Math.SQRT2,t.moveTo(u+h*Math.cos(a),f+h*Math.sin(a)),t.lineTo(u-h*Math.cos(a),f-h*Math.sin(a)),t.moveTo(u+h*Math.sin(a),f-h*Math.cos(a)),t.lineTo(u-h*Math.sin(a),f+h*Math.cos(a));break;case"star":h=i*Math.SQRT2,t.moveTo(u+h*Math.cos(a),f+h*Math.sin(a)),t.lineTo(u-h*Math.cos(a),f-h*Math.sin(a)),t.moveTo(u+h*Math.sin(a),f-h*Math.cos(a)),t.lineTo(u-h*Math.sin(a),f+h*Math.cos(a)),a+=Math.PI/4,t.moveTo(u+h*Math.cos(a),f+h*Math.sin(a)),t.lineTo(u-h*Math.cos(a),f-h*Math.sin(a)),t.moveTo(u+h*Math.sin(a),f-h*Math.cos(a)),t.lineTo(u-h*Math.sin(a),f+h*Math.cos(a));break;case"line":t.moveTo(u-i,f),t.lineTo(u+i,f);break;case"dash":t.moveTo(u,f),t.lineTo(u+i,f)}t.fill(),t.stroke()}},clipArea:(t,e)=>{t.save(),t.beginPath(),t.rect(e.left,e.top,e.right-e.left,e.bottom-e.top),t.clip()},unclipArea:t=>{t.restore()},lineTo:(t,e,i,s)=>{if(i.steppedLine)return"middle"===i.steppedLine&&!s?t.lineTo(e.x,i.y):t.lineTo(i.x,s?i.y:e.y),void t.lineTo(i.x,i.y);i.tension?t.bezierCurveTo(s?e.controlPointPreviousX:e.controlPointNextX,s?e.controlPointPreviousY:e.controlPointNextY,s?i.controlPointNextX:i.controlPointPreviousX,s?i.controlPointNextY:i.controlPointPreviousY,i.x,i.y):t.lineTo(i.x,i.y)}};var r=a;const l=t=>t.color?t:t.backgroundColor?{backgroundColor:t.backgroundColor}:void 0,h=new RegExp(/^(normal|(\d+(?:\.\d+)?)(px|em|%)?)$/),c=new RegExp(/^(normal|italic|initial|inherit|unset|(oblique( -?[0-9]?[0-9]deg)?))$/);function d(t,e){const i=(""+t).match(h);if(!i||"normal"===i[1])return 1.2*e;switch(t=+i[2],i[3]){case"px":return t;case"%":t/=100;break}return t*e}const u=(t,e)=>{const i=e||t.style;return void 0!==i.shadowBlur&&"0"!==i.shadowBlur&&"0px"!==i.shadowBlur||void 0!==i.shadowColor&&""!==i.shadowColor&&"transparent"!==i.shadowColor};function f(t,e){if(!e)return!1;const i=e.filter((e=>t.indexOf(e)>-1));return i.length>0}function g(t,e){return"string"==typeof t?t:t.fontWeight||e.fontWeight}function p(t,e,i,s){let n="";e.fontWeight&&(n=g(e,i)),s.weight=f([n],["bold","bolder"])?{value:"bold",width:700}:f([n,"normal","lighter"],[])?{value:n,width:400}:{value:Number.parseInt(n,10)?"",width:Number.parseInt(n,10)||400}}const m="normal";function x(t,e){const i=e||t.options.text,s=t.font||{},n=i.font||{},o=s.fontWeight;let a=s.fontWeight,r=i.weight;p(0,n,s,t),t.initWeight=r,t.weight=r.value||o||a||m}function b(t,e){let i,s=e||t.options.text,n=s.string,o=s.font||{},a=t.font||{},r=o.lineHeight,l=a.lineHeight;return r&&!l?i=r:l&&(i=l),i}function _(t,e){const i=e||t.options.text,s=i.font||{},n=t.font;if(!n)return;const o=s.size||n.size;if(!o)return;const a=i.string,r=a.font||{},l=r.lineHeight;let h=i.lineHeight;if(!h&&l)h=l;const c=b(t,e);i.lineHeight||(h||(h=c));const u=d(h,o);t.lineHeight=u}function y(t,e){try{t.style.font=e}catch(t){}}function v(t){return"number"==typeof t?t:0}function M(t,e){e.i18n=e.i18n||{},e.i18n.locale=e.locale||"en-US";const i=e,s=t.font||{},n=i.font||{},o=t.color,a=i.color,r=e.i18n.rtl,h=e.rtl;t.rtl=null!=r?r:null!=h&&h;const d=n.size||s.size||"12px",u=n.lineHeight||s.lineHeight,f=n.style||s.style||m,g=n.weight||s.weight||"normal",p=n.string||t.string||"",x=t.textAlign||i.textAlign||(r?"right":"left"),b=t.textBaseline||i.textBaseline||"middle",_=t.textBefore||i.textBefore||"",y=t.textAfter||i.textAfter||"";t.size=d,t.lineHeight=u,t.style=f,t.weight=g,t.string=p,t.textAlign=x,t.textBaseline=b,t.textBefore=_,t.textAfter=y,t.width=i.maxWidth||t.width,t.height=i.maxHeight||t.height,t.backdropPadding=i.backdropPadding||t.backdropPadding||5,t.color=null==a?o||"rgba(0,0,0,0.1)":a,t.shadowBlur=v(i.shadowBlur||t.shadowBlur||0),t.shadowColor=i.shadowColor||t.shadowColor||"rgba(0,0,0,0)",t.shadowOffsetX=v(i.shadowOffsetX||t.shadowOffsetX||0),t.shadowOffsetY=v(i.shadowOffsetY||t.shadowOffsetY||0),C(s,n,t);const M=t.transform=i.transform||t.transform||[1,0,0,1,0,0];Array.isArray(M)&&6===M.length||(t.transform=[1,0,0,1,0,0])}function w(t,e){M(t,e),x(t,e),_(t,e),t._fontString=function(t){const e=t.style||m,i=t.weight||"normal",s=t.size||"12px",n=t.font?.family||t.family;return`${e} ${i} ${s} ${n||""}`}(t),t.widthSizePx=function(t){const e=t.size||"12px";try{const i=e.match(/^([0-9]+)(px|em|%)?$/);if(i)return parseInt(i[1],10);const s=parseInt(e,10);return isNaN(s)?12:s}catch(t){return 12}}(t)}function k(t,e){const i=t.canvas,s=t.currentDevicePixelRatio=e||1,n=t.width/s,o=t.height/s;let a=!0;return i&&i.width===t.width&&i.height===t.height||(i&&i.width&&i.height&&(t.width=i.width,t.height=i.height,n=t.width/s,o=t.height/s),t.x=0,t.y=0,t.width=n,t.height=o,a=!1),a}function S(t){t._animationsCache||(t._animationsCache={}),t._animations=t._animations||[]}function P(t,e){if(!e)return S(t),!0;const i=C(t._animations,e);return S(t),i}function D(t){t._lastText||(t._lastText={string:"",width:0})}function C(t,e){for(let i=e.length-1;i>=0;i--)if(e[i]){const s=e[i];t.push(s)}return!0}function O(t,e,i){return{name:t,options:e,chart:i}}function T(t){for(const e of t.plugins)if(!1===t.notifyPlugins(e.plugin+":beforeInit",[e]))return!1;return!0}function A(t,e,i){for(const s of t.plugins)t.options[s.plugin]&&(t.notifyPlugins(s.plugin+":"+e.name,[e,i]),!1===i.stopped&&t.notifyPlugins(s.plugin+":after"+e.name,[e]))}function L(t,e,i){for(const s of t.plugins)t.options[s.plugin]&&t.notifyPlugins(s.plugin+":"+e.name,[e,i])}function E(t){t.plugins=[],t.notifyPlugins=function(t,e=[]){let i=!1;for(let s=0;s<this.plugins.length;s++){const n=this.plugins[s];n.plugin!==t.split(":")[0]||(this.options[n.plugin]&&("beforeInit"===t.split(":")[1]?i=n.beforeInit.apply(this,e):n[t.split(":")[1]]&&n[t.split(":")[1]].apply(this,e)))}return i},t.initPlugins=function(t){const e=this,i=t||Object.keys(e.options).filter((t=>t.indexOf("plugin")>-1&&t.indexOf(":")<0)).map((t=>({plugin:t.substring(6).toLowerCase(),instance:null,beforeInit:null})));return e.plugins=i,e.options.plugins={},Object.keys(e.options).filter((t=>t.indexOf("plugin:")>-1)).forEach((function(t){const i=t.substring(7);e.options.plugins[i]=e.options[t]})),T(e)}}function R(t,e,i){0===e._animations.length&&e._drawText(i||t)}function I(t,e,i,s,n){u(e,e.options)&&(i.push((i=>{n&&(e.x=t.x,e.y=t.y);const o=i.options,a=i.width,r=i.height,l=s&&s.shadowBlur||e.shadowBlur,h=s&&s.shadowOffsetX||e.shadowOffsetX,c=s&&s.shadowOffsetY||e.shadowOffsetY,d=s&&s.shadowColor||e.shadowColor,f=s&&s.color||e.color;return l>0&&(i.save(),i.shadowBlur=l,i.shadowOffsetX=h,i.shadowOffsetY=c,i.shadowColor=d,o.content?o.content(i,t,a,r,f):e.content&&e.content(i,t,a,r,f),i.restore(),!0),o.content?o.content(i,t,a,r,f):e.content&&e.content(i,t,a,r,f),!0})),s=e))}i=!0,function(t,e){if("complete"===document.readyState||"interactive"===document.readyState){t.call(null);return}e&&document.addEventListener("DOMContentLoaded",t)}(t=>{if(!0===i){const e=1===t.type,s=t.target;"resize"===t.type?setTimeout((()=>{const t=function(t){if(!t||!t.parentNode)return!1;const e=t.parentNode;return e.nodeName.toLowerCase()===\'canvas\'&&"function"==typeof e.reflow||(e.nodeName.toLowerCase()===\'div\'&&!0===e.reflow)}(s);if(t&&"function"==typeof t.reflow){const e=s.width,i=s.height;s.reflow&&!s.reflow()&&(s.style.width=e+"px",s.style.height=i+"px")}})):e&&function(t){if(!t)return;const e=t;if("function"==typeof t.canvas.getContext){const t=e.canvas;if(!t||!t.parentNode)return;const i=t.parentNode;i&&(i.style.height=t.style.height,i.style.width=t.style.width)}}(s)}});var i;function z(t,e){E(t),t.options.plugins=e||{}}function F(t,e,i){w(t,e);const s=t.ctx,n=t.width,o=t.height,a=t.transform,r=i&&i.skipTransform||!1;let l,h;if(k(s),r||s.setTransform(a[0],a[1],a[2],a[3],a[4],a[5]),s.font=t._fontString,s.textAlign=t.textAlign,s.textBaseline=t.textBaseline,l=t.string,h=t.width,D(t),function(t,e){return t._lastText&&t._lastText.string===e.string&&t._lastText.width===e.width&&t._lastText.textAlign===e.textAlign}(t,t))return t._lastText.width;if(""===l||null==l)return t._lastText.width=0,0;if("string"!=typeof l){let e="";for(let i=0;i<l.length;i++){const s=l[i];s&&"string"==typeof s&&(e+=s)}l=e}h=null===h?s.measureText(l).width:h,t._lastText.string=l,t._lastText.width=h,t._lastText.textAlign=t.textAlign,t._lastText.textBaseline=t.textBaseline;const c=s.measureText("M").width/s.measureText("M").width;return h/c}function V(t,e,i){w(t,e);const s=t.ctx,n=t.string,o=t.width=F(t,null,{skipTransform:!0}),a=t.height=function(t,e){const i=t.ctx,s=t.widthSizePx,n=t.string;return t.lineHeight*Math.max(1,Math.ceil(i.measureText(n).width/s))}(t);if(k(s),!n||!n.length)return!0;s.save(),s.font=t._fontString,s.textAlign=t.textAlign,s.textBaseline=t.textBaseline,s.fillStyle=t.color,s.setTransform(i[0],i[1],i[2],i[3],i[4],i[5]);let r=0,l=0;const h=u(t);if(h&&(s.shadowColor=t.shadowColor,s.shadowBlur=t.shadowBlur,s.shadowOffsetX=t.shadowOffsetX,s.shadowOffsetY=t.shadowOffsetY),"center"===t.textAlign?r=-o/2:"end"!==t.textAlign&&"right"!==t.textAlign||(r=-o),"top"===t.textBaseline?l+=t.lineHeight/2:"bottom"===t.textBaseline&&(l-=a-t.lineHeight/2),s.translate(r,l),s.fillText(t.string,0,0),s.restore(),R(t,t),!0!==i.cancelable){t.x+=r,t.y+=l;let e={x1:t.x,y1:t.y,x2:t.x+o,y2:t.y+a};const s=t.transform||[1,0,0,1,0,0],n=[s[0],s[1],s[2],s[3],s[4],s[5]];return function(t,e,i,s){let n=e[0],o=e[2],a=e[4],r=e[1],l=e[3],h=e[5],c=n*l-r*o;if(0===c)return!1;c=1/c,i.x=l*c*(t.x1-a)+(-o)*c*(t.y1-h)+a,i.y=n*c*(t.y1-h)+(-r)*c*(t.x1-a)+h,s.x=l*c*(t.x2-a)+(-o)*c*(t.y2-h)+a,s.y=n*c*(t.y2-h)+(-r)*c*(t.x2-a)+h}(e,n,e={},e={}),!0}return!0}function B(t,e,i,s,n){const o={};if(!e&&0!==e)return o;const a=s||{},r=a.backdropPadding||a.padding||0;if(isNaN(e)||null===e)return o;e=Math.min(Math.abs(e),80),"number"==typeof r&&(o.backdropPadding=r);const l=e/2,h=i?l:-l,c=Math.sin(h),d=Math.cos(h);let u=t.x,f=t.y;return t.x=u*d-f*c,t.y=u*c+f*d,o.transformation=[d,-c,c,d,0,0],o.cancel=function(){t.x=u,t.y=f},s&&(t.textAlign=function(t,e){if(null===e||void 0===e)return t;switch(e){case"left":case"start":return"left";case"right":case"end":return"right";default:return"center"}}(s.textAlign||t.textAlign,e),t.textBaseline=function(t,e){if(null===e||void 0===e)return t;return"middle"}(s.textBaseline||t.textBaseline,e)),n&&(n.textAlign=t.textAlign,n.textBaseline=t.textBaseline),o}function W(t,e,i,s,n){let o=t,a=i;t._animations=t._animations||[];const r=s&&!s.cancelable||!1;if(s&&s.cancelable&&s.cancel(),i&&i.radians&&i.radians>0){const s=B(t,i.radians,i.clockwise,i,n);a=Object.assign({},i);const{backdropPadding:r,transformation:l}=s;t._animationTransforms=l,t._animationOptions=i,t._animationCancels=s.cancel,t._backdropPadding=r,o=t}e&&S(t),P(t,t._animations),o._animations.push((t=>{const e=null!=t.ctx?t.ctx:null;return e&&"object"==typeof e&&V(o,null,{0:a.transformation?a.transformation[0]:1,1:a.transformation?a.transformation[1]:0,2:a.transformation?a.transformation[2]:0,3:a.transformation?a.transformation[3]:1,4:a.transformation?a.transformation[4]:0,5:a.transformation?a.transformation[5]:0,cancelable:r})}));const l=!r&&t._animationCancels;return l&&"function"==typeof l&&e&&(l(),delete t._animationCancels,delete t._animationTransforms,delete t._animationOptions,delete t._backdropPadding),e&&R(t,o),!0}function N(t,e,i,s,n){const o=e,a=i||{},r=s||{},l=r.font||{},h=e.renderTo||0;let c;c=n?"function"==typeof n?n:null:h&&"function"==typeof h._draw?h._draw:null;const d={};return a&&(d.font=Object.assign({},e.font||{}),Object.keys(a).forEach((t=>{d[t]=a[t];const i=e[t];i&&"object"==typeof i&&a[t]&&"object"==typeof a[t]&&(d[t]=Object.assign({},i,a[t]))})),t.options=d,t.font=o.font),l&&Object.keys(l).length&&null!==l&&(t.font=Object.assign({},t.font||{},l)),c&&(t._draw=c),t}function j(t,e){const i=t.renderTo||0,s=i&&"function"==typeof i.reflow?i.reflow:null;return"function"!=typeof s||!1!==s()||e||!1}function H(t,e,i,s,n){t.ctx||(t.ctx=s);const o=t._animationsCache||[];let a=!0;i&&j(t)&&(P(t,o)&&(a=o.length<1),t.refresh&&R(t,t,i)),n&&n(t,e),a&&t._draw&&"function"==typeof t._draw&&t._draw(s,t)}function $(t,e,i,s){return t.options=t.options||{},W(t,e,i,s)}function Y(t,e,i){i=i||{};const s=t.options=Object.assign({},t.options||{},e||{}),n=i.drawModeOverride||"default",o=s.draw&&s.draw[n]||s.draw&&s.draw.default||t.draw;o&&"function"==typeof o&&(t.draw=o)}function U(t,e,i,s){const n={};return Object.assign(n,t.options||{},e||{}),t.options=n,Y(t,e,s),H(t,e,i),!0}function X(t,e,i){return t.x=e||0,t.y=i||0,t}function q(t,e,i){i=i||{};const s=t.renderTo,n=e&&e.ctx||t.ctx||s&&s.getContext&&s.getContext("2d");return n?n.canvas&&n.canvas.getContext&&(t.canvas=n.canvas):s&&s.getContext&&(t.canvas=s,n&&"object"==typeof n&&(t.ctx=n)),!0!==i.skipRefresh&&t.refresh&&"function"==typeof t.refresh&&t.refresh(),(s||e||i)&&(j(t,i.forceReflow),H(t,t.options,i.noReflow,n)),!0}function K(t,e,i){let s,n,o,a={},r=t.options||{},l=r.text||{};if("function"==typeof e)t.options=e(i,t.options);else{if("string"==typeof e&&""===e)return;s="object"==typeof e?e:i&&i.plugins&&i.plugins.datalabels&&i.plugins.datalabels[e],n=null!==s&&void 0!==s&&"object"==typeof s?s:{},o=n.listeners||r.listeners||{},a=n.clamp||r.clamp||{},l=n.text||l||{}}return z(t,null),Y(t,a),E(t),t.initPlugins(o),a}function G(t,e){const i=t.options.padding||e.padding||{top:0,left:0,bottom:0,right:0};let s={x:e.x,y:e.y,width:e.width,height:e.height};if("function"==typeof i){const e=i();Array.isArray(e)?s.x+=e[3]||0:s.x+=e.left||0}else"object"==typeof i?Array.isArray(i)?s.x+=i[3]||0:s.x+=i.left||0:"number"==typeof i&&(s.x+=i);return s}function Z(t,e,i,s){const n=e||{},o=i||{},a=n.x,r=n.y,l=G(t,{x:a,y:r,width:0,height:0,padding:o.padding||{}});X(t,l.x,l.y),N(t,t,o.updateOptions),M(t,t),s&&s.clearRect(0,0,n.width,n.height),V(t,null,[1,0,0,1,0,0]);const h=t.options.padding||o.padding||{top:0,left:0,bottom:0,right:0},c=t.width+(Array.isArray(h)?h[1]+h[3]:h.right+h.left),d=o.maxWidth||n.width||c;return s&&s.translate(a+(d-c)/2,r),!0}function J(t,e,i){return!t||t.indexOf(e)<0?e:i}function Q(t,e,i){i=i||"";const s=e||t.options,n=s.align||"center",o=s.position||"center",a=s.positionType||"arc";let r=0;switch(a){case"arc":r=-90;break;case"border":}return{align:J(["left","center","right"],n,e?J(["start","middle","end"],n,"middle"):n),position:J(["top","center","bottom"],o,e?J(["inner","center","outer"],o,"center"):o),positionType:J(["border","arc"],a,a),angle:r,arc:{}}}function tt(t){return(t=null==t?2:t)<0||isNaN(t)?2:t}const et=t=>null!=t,it={resize(t,e){return function(t,e){return e||(e={}),t.options=Object.assign({},t.options||{},e),t}(t,e)},reflow(){return j},update(t,e,i){N(t,t,e=e||{}),U(t,e,i),Y(t,e)},draw(t,e,i){return H(t,e,i,e&&e.ctx),!0},rotate(t,e,i,s){return $(t,!1,e,{radians:i,clockwise:s})},translate(t,e,i){return X(t,e,i),t},clear(t,e){if(e){const i=t.ctx||e&&e.ctx;i&&i.clearRect(0,0,i.canvas.width,i.canvas.height)}return S(t),P(t,t._animations)},cancel(t){if(t)return S(t),!0;if(t._animationCancels&&"function"==typeof t._animationCancels)return t._animationCancels(),delete t._animationCancels,delete t._animationTransforms,delete t._animationOptions,delete t._backdropPadding,!0}};function st(t,e,i){return i&&"object"==typeof i?Object.assign({},i,t||e||{},i||{}):"string"==typeof t?i=e={text:{content:t}}:Array.isArray(t)||"function"==typeof t?(i=i||{},e=null,i.text={content:t}):i={},i}function nt(t){let e={};const i=void 0===t?{}:t;return Object.assign(e,{x:0,y:0,options:i,loadPlugin:function(t,e){!function(t,e,i,s){z(t),Y(t,e,i),H(t,e,!1,i,s)}(this,i,t,e)},plugins:[]},i.controller||{}),z(e),Y(e,i),e}class ot{constructor(t,e,i,s){t=t||{},this._animations=[],this._animationsCache=[],this.x=0,this.y=0,X(this,e,i),this.renderTo=s,this.options=t,M(this,t),z(this),Y(this,t)}active(){return!0}draw(t){return H(this,null,t,t),!0}resize(t){return it.resize(this,t)}reflow(){return j(this,!1)}update(t){t=t||{};let e=this.options&&this.options.animated;return arguments.length>1?e=arguments[1]:{},arguments.length>2&&(e=arguments[2]),N(this,this,t),U(this,t,!e),Y(this,t),this}rotate(t,e,i){return $(this,!1,{radians:t,clockwise:e},i),!0}cancel(){return it.cancel(this)}clear(t){return it.clear(this,t),this}translate(t,i){return X(this,t,i),this}refresh(){return R(this,this),j(this),!0}}}();
+                    
+                    console.log("Chart.js embedded and initialized successfully!");
+                    window.Chart = Chart; // Make Chart globally available
+                }
+            } catch (e) {
+                console.error("Failed to initialize embedded Chart.js:", e);
+                
+                // Define a dummy Chart object if loading fails
+                window.Chart = function(context, config) {
+                    console.log("Dummy Chart created");
+                    const fallbackElement = document.getElementById('population-chart-container');
+                    if (fallbackElement && !fallbackElement.querySelector('.chart-fallback-message')) {
+                        const fallbackMessage = document.createElement('div');
+                        fallbackMessage.textContent = "Using simplified chart visualization.";
+                        fallbackMessage.style.color = '#aaccff';
+                        fallbackMessage.style.textAlign = 'center';
+                        fallbackMessage.style.marginTop = '20px';
+                        fallbackMessage.className = 'chart-fallback-message';
+                        fallbackElement.appendChild(fallbackMessage);
+                    }
+                    return {
+                        update: function() {
+                            // Handled by fallback drawing
+                            if (window.drawFallbackChart) window.drawFallbackChart();
+                        },
+                        destroy: function() {
+                            const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
+                            if (fallbackMessage) fallbackMessage.remove();
+                        }
+                    };
+                };
+            }
         });
     </script>
     <style>
@@ -582,7 +694,7 @@
 </head>
 <body>
     <!-- Debug elements -->
-    <div id="debug-info" style="display: none; position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; z-index: 1000; font-family: monospace; font-size: 12px; color: #lime; max-height: 150px; overflow-y: auto; border-radius: 5px; border: 1px solid #555;"></div>
+    <div id="debug-info" style="display: none; position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; z-index: 1000; font-family: monospace; font-size: 12px; color: lime; max-height: 150px; overflow-y: auto; border-radius: 5px; border: 1px solid #555;"></div>
 
     <!-- Improvement 1: Scientific Concept Panel -->
     <button id="toggle-concept-panel">Science Concepts</button>
@@ -925,13 +1037,26 @@
                 const isShowing = panel.classList.toggle('show');
                 this.textContent = isShowing ? 'Hide Data' : 'Show Data';
                 debugLog(`Data panel ${isShowing ? 'shown' : 'hidden'}`);
-                 // Trigger chart update when shown if needed (or let draw loop handle it)
-                 if (isShowing && window.populationChart && typeof window.populationChart.update === 'function') {
-                     // Ensure chart has data immediately if available
+                
+                if (isShowing) {
+                    // Ensure chart is initialized when panel is shown
+                    if (!populationChart || (typeof populationChart === 'object' && !populationChart.data)) {
+                        setupPopulationChart();
+                    }
+                    
+                    // Force an update for the chart or fallback visualization
                     if (window.p5Instance && window.p5Instance.updatePopulationChart) {
                         window.p5Instance.updatePopulationChart(true); // Force update
+                    } else {
+                        // If p5Instance not available yet, draw fallback directly
+                        drawFallbackChart();
                     }
-                 }
+                    
+                    // Also update metrics panel
+                    if (window.p5Instance) {
+                        updateStatus();
+                    }
+                }
             });
 
             // Show References button
@@ -1638,17 +1763,34 @@
                     let chartElement = document.getElementById('population-chart');
                     if (!chartElement) {
                         debugLog("Error: Population chart canvas element not found.");
+                        drawFallbackChart(); // Still attempt fallback
                         return;
                     }
+
+                    // First check if Chart is already properly initialized
+                    if (populationChart && typeof populationChart.update === 'function' && 
+                        populationChart.data && populationChart.data.datasets) {
+                        debugLog("Chart already initialized, just updating data.");
+                        updatePopulationChart(true);
+                        return;
+                    }
+                    
                     let ctx = chartElement.getContext('2d');
                     if (!ctx) {
                         debugLog("Error: Could not get 2D context for population chart.");
+                        drawFallbackChart();
                         return;
                     }
 
                     // Check if Chart is available and is a constructor function
                     if (typeof window.Chart === 'function') {
                         debugLog("Setting up Chart.js for population graph.");
+                        
+                        // Destroy existing chart if it exists
+                        if (populationChart && populationChart.destroy) {
+                            populationChart.destroy();
+                        }
+                        
                         populationChart = new window.Chart(ctx, {
                             type: 'line',
                             data: {
@@ -1704,6 +1846,12 @@
                                 }
                             }
                         });
+                        
+                        // Update with initial data if available
+                        if (window.simulationVars.populationHistory.timestamps.length > 0) {
+                            updatePopulationChart(true);
+                        }
+                        
                         // Remove fallback message
                         const fallbackElement = document.getElementById('population-chart-container');
                         const fallbackMessage = fallbackElement?.querySelector('.chart-fallback-message');
@@ -1712,7 +1860,9 @@
                         debugLog("Chart.js library not available. Using fallback visualization.");
                         // Define a simple object with update and destroy methods
                         populationChart = { 
-                            update: function() {}, 
+                            update: function() {
+                                drawFallbackChart(); // Always draw fallback when update is called
+                            }, 
                             destroy: function() {} 
                         };
                         drawFallbackChart(); // Initial draw of fallback
@@ -1721,7 +1871,10 @@
                     debugLog("Error setting up population chart: " + err.message);
                     console.error(err);
                     // Ensure populationChart is at least a dummy object
-                    populationChart = { update: function() {}, destroy: function() {} };
+                    populationChart = { 
+                        update: function() { drawFallbackChart(); }, 
+                        destroy: function() {} 
+                    };
                     drawFallbackChart();
                 }
             }
@@ -1744,14 +1897,41 @@
 
                  const history = window.simulationVars.populationHistory;
                  if (history.timestamps.length > 0) {
-                     const lastIndex = history.timestamps.length - 1;
-                     fallbackDisplay.innerHTML = `
-                        Time: ${history.timestamps[lastIndex]}s <br>
-                        Healthy: <span style="color: #87CEFA;">${history.healthyCounts[lastIndex]}</span> |
-                        Cancer: <span style="color: #FF5070;">${history.cancerCounts[lastIndex]}</span>
+                     // Create a simplified visual representation
+                     let htmlContent = `<div style="margin: 10px 0 20px 0;">Time: ${history.timestamps[history.timestamps.length-1]}s</div>`;
+                     
+                     // Create a simple bar chart
+                     htmlContent += '<div style="display: flex; height: 80px; margin: 10px 0; align-items: flex-end; justify-content: center; gap: 5px;">';
+                     
+                     // Only show the last 15 data points for simplicity
+                     const displayPoints = Math.min(15, history.timestamps.length);
+                     const startIdx = Math.max(0, history.timestamps.length - displayPoints);
+                     
+                     for (let i = startIdx; i < history.timestamps.length; i++) {
+                         const healthyHeight = Math.min(70, history.healthyCounts[i] / 5);
+                         const cancerHeight = Math.min(70, history.cancerCounts[i] / 5);
+                         
+                         htmlContent += `
+                             <div style="display: flex; flex-direction: column; align-items: center; width: 20px;">
+                                 <div style="height: ${healthyHeight}px; width: 8px; background-color: #87CEFA;"></div>
+                                 <div style="height: ${cancerHeight}px; width: 8px; background-color: #FF5070; margin-top: 2px;"></div>
+                             </div>
+                         `;
+                     }
+                     
+                     htmlContent += '</div>';
+                     
+                     // Add legend
+                     htmlContent += `
+                         <div style="display: flex; justify-content: center; gap: 20px; font-size: 0.85em; margin-top: 5px;">
+                             <div><span style="display: inline-block; width: 10px; height: 10px; background-color: #87CEFA; margin-right: 5px;"></span>Healthy: ${history.healthyCounts[history.healthyCounts.length-1]}</div>
+                             <div><span style="display: inline-block; width: 10px; height: 10px; background-color: #FF5070; margin-right: 5px;"></span>Cancer: ${history.cancerCounts[history.cancerCounts.length-1]}</div>
+                         </div>
                      `;
+                     
+                     fallbackDisplay.innerHTML = htmlContent;
                  } else {
-                     fallbackDisplay.textContent = "No population data yet.";
+                     fallbackDisplay.textContent = "No population data yet. Data will appear as the simulation runs.";
                  }
                  container.appendChild(fallbackDisplay);
             }
@@ -1788,9 +1968,17 @@
                  // Add data to history
                  const timeElapsed = Math.floor(p.frameCount / 60); // Approximate seconds based on 60fps assumption
                  const history = window.simulationVars.populationHistory;
-                 history.timestamps.push(timeElapsed);
-                 history.healthyCounts.push(healthyCount);
-                 history.cancerCounts.push(cancerCount);
+                 
+                 // Prevent duplicates for same timestamp
+                 if (history.timestamps.length === 0 || history.timestamps[history.timestamps.length-1] !== timeElapsed) {
+                     history.timestamps.push(timeElapsed);
+                     history.healthyCounts.push(healthyCount);
+                     history.cancerCounts.push(cancerCount);
+                 } else {
+                     // Update the last entry instead of adding duplicate timestamp
+                     history.healthyCounts[history.healthyCounts.length-1] = healthyCount;
+                     history.cancerCounts[history.cancerCounts.length-1] = cancerCount;
+                 }
 
                  // Trim history to keep it manageable (e.g., last 60 data points)
                  const maxDataPoints = 60;
@@ -1800,9 +1988,10 @@
                      history.cancerCounts.shift();
                  }
 
-                 // Update the chart instance
-                 if (populationChart && typeof populationChart.update === 'function') {
-                     try {
+                 // Update the chart instance or use fallback
+                 try {
+                     // Check if populationChart is a valid Chart.js instance
+                     if (populationChart && typeof populationChart.update === 'function') {
                          // Check if it's a real Chart.js chart with data structure
                          if (populationChart.data && populationChart.data.labels) {
                              populationChart.data.labels = history.timestamps; // Use raw timestamps for labels now
@@ -1813,17 +2002,17 @@
                              // If it's the fallback/dummy, call the drawing function
                              drawFallbackChart();
                          }
-                     } catch (err) {
-                         debugLog("Error updating population chart: " + err.message);
-                         console.error(err);
-                         // Attempt fallback draw on error
+                     } else {
+                         // If chart hasn't been initialized yet, try fallback
                          drawFallbackChart();
                      }
-                 } else if (!populationChart) {
-                      // If chart hasn't been initialized yet (rare edge case), try fallback
-                      drawFallbackChart();
+                 } catch (err) {
+                     debugLog("Error updating population chart: " + err.message);
+                     console.error(err);
+                     // Always attempt to show fallback on error
+                     drawFallbackChart();
                  }
-            }
+             }
              // Make accessible globally via p5 instance
              p.updatePopulationChart = updatePopulationChart;
 
